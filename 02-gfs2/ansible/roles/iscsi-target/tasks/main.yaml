@@ -1,0 +1,38 @@
+- name: Install targetcli package
+  yum:
+    name:
+      - targetcli
+
+- name: Create block backstore
+  command: targetcli /backstores/block create {{ iscsi_blockname }} dev=/dev/disk/by-id/virtio-isci-disk
+  register: result
+  failed_when: (result.rc != 0) and (result.stderr != "Storage object block/"+iscsi_blockname+" exists")
+  changed_when: result.stderr != "Storage object block/"+iscsi_blockname+" exists"
+
+- name: Create iscsi target
+  command: targetcli /iscsi create {{ iscsi_iqn }}:storage.target00
+  register: result
+  failed_when: (result.rc != 0) and (result.stderr != "This Target already exists in configFS")
+  changed_when: result.stderr != "This Target already exists in configFS"
+
+- name: Create iscsi lun
+  command: targetcli /iscsi/{{ iscsi_iqn }}:storage.target00/tpg1/luns create /backstores/block/{{ iscsi_blockname }}
+  register: result
+  failed_when: (result.rc != 0) and (result.stderr != "lun for storage object block/"+iscsi_blockname+" already exists")
+  changed_when: result.stderr != "lun for storage object block/"+iscsi_blockname+" already exists"
+
+- name: Get attributes
+  command: targetcli /iscsi/{{ iscsi_iqn }}:storage.target00/tpg1 get attribute
+  register: iscsi_attributes_result
+  changed_when: false
+
+- name: Disable authentication
+  when: '"authentication=0" not in iscsi_attributes_result.stdout'
+  command: targetcli /iscsi/{{ iscsi_iqn }}:storage.target00/tpg1 set attribute authentication=0
+
+- name: targetcli acl
+  command : "targetcli /iscsi/{{ iscsi_iqn }}:storage.target00/tpg1/acls create {{ iscsi_iqn }}:{{ item }}"
+  with_items: "{{ groups.gvfs2 }}"
+  register: result
+  failed_when: '(result.rc != 0) and ("This NodeACL already exists in configFS" not in result.stderr)'
+  changed_when: '"This NodeACL already exists in configFS" not in result.stderr'

@@ -1,0 +1,121 @@
+- name: Install pacemaker, clvm, gfs2 packages
+  dnf:
+    name:
+      - device-mapper-multipath
+      - gfs2-utils
+      - lvm2-lockd
+      - gfs2-utils
+      # not in CentOS 8 Stream repo
+      - https://repo.almalinux.org/almalinux/8/HighAvailability/x86_64/os/Packages/dlm-4.1.0-1.el8.x86_64.rpm
+    enablerepo:
+      - ha
+      - rs
+    state: present
+
+- name: Pcs create dlm resource
+  command: pcs resource create dlm --group locking ocf:pacemaker:controld op monitor interval=30s on-fail=fence
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "already exists" not in result.stderr
+  changed_when:
+    - '"already exists" not in result.stderr'
+
+- name: Pcs clone locking resource group
+  command: pcs resource clone locking interleave=true
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "cannot clone a group that has already been cloned" not in result.stderr
+  changed_when:
+    - '"cannot clone a group that has already been cloned" not in result.stderr'
+
+- name: Pcs create lvmlockd resource
+  command: pcs resource create lvmlockd --group locking ocf:heartbeat:lvmlockd op monitor interval=30s on-fail=fence
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "already exists" not in result.stderr
+  changed_when:
+    - '"already exists" not in result.stderr'
+
+
+# TODO: Wait until lvmlockd started, otherwise error "Using a shared lock type requires lvmlockd" will spawn
+- name: vgcreate --shared
+  command: vgcreate --shared svg0 /dev/sda
+  when: inventory_hostname == play_hosts[0]
+  register: vgcreate_result
+  failed_when:
+    - vgcreate_result.rc != 0 and "already exists" not in vgcreate_result.stderr
+  changed_when:
+    - '"already exists" not in vgcreate_result.stderr'
+
+- name: vgchange --lock-start
+  command: vgchange --lock-start svg0
+  when: (inventory_hostname != play_hosts[0]) and (hostvars[groups.gvfs2[0]].vgcreate_result.changed)
+
+- name: lvcreate
+  command: lvcreate --activate sy  -l+100%FREE -n lv0 svg0
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "Calculated size of logical volume is 0 extents" not in result.stderr
+  changed_when:
+    - '"Calculated size of logical volume is 0 extents" not in result.stderr'
+
+- name: mkfs.gvfs2
+  command: mkfs.gfs2 -O -j{{ groups['gvfs2'] | length }} -p lock_dlm -t {{ pacemaker_hacluster_name }}:lv0 /dev/svg0/lv0
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "Device or resource busy" not in result.stderr
+  changed_when:
+    - '"Device or resource busy" not in result.stderr'
+
+- name: Pcs create sharedlv0 resource
+  command: pcs resource create sharedlv0 --group sanstorage ocf:heartbeat:LVM-activate lvname=lv0 vgname=svg0 activation_mode=shared vg_access_mode=lvmlockd
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "already exists" not in result.stderr
+  changed_when:
+    - '"already exists" not in result.stderr'
+
+- name: Pcs clone sanstorage resource group
+  command: pcs resource clone sanstorage interleave=true
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "cannot clone a group that has already been cloned" not in result.stderr
+  changed_when:
+    - '"cannot clone a group that has already been cloned" not in result.stderr'
+
+- name: Pcs constraint order
+  command: pcs constraint order start locking-clone then sanstorage-clone
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "duplicate constraint already exists" not in result.stderr
+  changed_when:
+    - '"duplicate constraint already exists" not in result.stderr'
+
+- name: Pcs constraint colocation
+  command: pcs constraint colocation add sanstorage-clone with locking-clone
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "duplicate constraint already exists" not in result.stderr
+  changed_when:
+    - '"duplicate constraint already exists" not in result.stderr'
+
+- name: Pcs create sharedfs0 resource
+  command: |
+    pcs resource create sharedfs0 --group sanstorage ocf:heartbeat:Filesystem \
+      device="/dev/svg0/lv0" directory="/mnt/" fstype="gfs2" options=noatime,nodiratime \
+      op monitor interval=10s on-fail=fence
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "already exists" not in result.stderr
+  changed_when:
+    - '"already exists" not in result.stderr'

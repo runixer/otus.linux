@@ -1,0 +1,81 @@
+- name: Install pacemaker, pcs
+  dnf:
+    name:
+      - pacemaker
+      - pcs
+      - fence-agents-all
+      - pcp-zeroconf
+    enablerepo:
+      - ha
+      - rs
+    state: present
+
+- name: Enable pcsd service
+  systemd:
+    name: pcsd
+    state: started
+    enabled: yes
+
+- name: Setting hacluster password
+  user:
+    name:  "{{ pacemaker_hacluster_user }}"
+    password: "{{ pacemaker_hacluster_sha }}"
+  become: true
+
+- name: Get pcs status
+  command: pcs status
+  register: pcs_status
+  changed_when: false
+  failed_when: '(pcs_status.rc != 0) and ("Error: cluster is not available on this node" not in pcs_status.stderr)'
+
+- name: Pcs host auth
+  when: inventory_hostname not in pcs_status.stdout
+  command: pcs host auth {{ groups['gvfs2']|join(' ') }} -u {{ pacemaker_hacluster_user }} -p  {{ pacemaker_hacluster_password }}
+  ignore_errors: true
+
+- name: Pcs cluster setup
+  command: pcs cluster setup {{ pacemaker_hacluster_name }} --start {{ groups['gvfs2']|join(' ') }}
+  when: (inventory_hostname == play_hosts[0]) and ("Cluster Summary" not in pcs_status.stdout)
+  register: result
+  failed_when:
+    - result.rc != 0 and "The host seems to be in a cluster" not in result.stderr
+  changed_when:
+    - '"The host seems to be in a cluster" not in result.stderr'
+
+- name: Pcs cluster enable
+  when: >
+    ("corosync: active/enabled" not in pcs_status.stdout) or
+    ("pacemaker: active/enabled" not in pcs_status.stdout) or
+    ("pcsd: active/enabled" not in pcs_status.stdout)
+  command: pcs cluster enable --all
+
+- name: Pcs get properties
+  command: pcs property show
+  when: inventory_hostname == play_hosts[0]
+  changed_when: false
+  register: pcs_property_result
+
+- name: Pcs set no-quorum-policy property
+  when: '(inventory_hostname == play_hosts[0]) and ("no-quorum-policy: freeze" not in pcs_property_result.stdout)'
+  command: pcs property set no-quorum-policy=freeze
+
+- name: Pcs set stonith-enabled property
+  when: '(inventory_hostname == play_hosts[0]) and ("stonith-enabled: true" not in pcs_property_result.stdout)'
+  command: pcs property set stonith-enabled=true
+
+- name: Pcs create dummy fence
+  copy:
+    src: files/fence_dummy.py
+    dest: /usr/sbin/fence_dummy
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Pcs enable dummy fencing
+  command: pcs stonith create fence_dummy fence_dummy
+  when: inventory_hostname == play_hosts[0]
+  register: result
+  failed_when:
+    - result.rc != 0 and "already exists" not in result.stderr
+  changed_when:
+    - '"already exists" not in result.stderr'

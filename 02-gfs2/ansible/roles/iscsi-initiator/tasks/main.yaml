@@ -1,0 +1,37 @@
+- name: Install iscsi-initiator-utils
+  yum:
+    name:
+      - iscsi-initiator-utils
+      - iscsi-initiator-utils-iscsiuio
+    state: present
+
+- name: Change iqn
+  lineinfile:
+    path: /etc/iscsi/initiatorname.iscsi
+    regexp: '^InitiatorName=.*'
+    line: 'InitiatorName={{ iscsi_iqn }}:{{ inventory_hostname }}'
+  register: iqn
+
+- name: Restart iscsi on iqn change
+  when: iqn.changed
+  systemd:
+    name: iscsi
+    state: restarted
+
+- name: List iscsi discovery
+  command: iscsiadm -m discovery -l
+  register: current_discovery_result
+  changed_when: false
+  # rc == 21 when no iscsi currently discovered
+  failed_when: current_discovery_result.rc != 0 and current_discovery_result.rc != 21
+
+- name: iscsiadm discovery
+  when: item not in current_discovery_result.stdout
+  command: "iscsiadm -m discovery -t st -p {{ item }}"
+  with_items: "{{ groups.iscsi }}"
+  register: discovery_result
+
+- name: iscsiadm connect
+  when: discovery_result.changed
+  command: 'iscsiadm -m node -l -T {{ item.split(" ")[1] }}'
+  with_items: "{{ discovery_result.results | map(attribute='stdout_lines') | flatten }}"

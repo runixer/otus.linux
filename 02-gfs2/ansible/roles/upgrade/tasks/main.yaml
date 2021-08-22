@@ -1,0 +1,35 @@
+- name: Upgrade Debian Family OS packages
+  when: ansible_os_family == "Debian"
+  ansible.builtin.apt:
+    upgrade: full
+    update_cache: yes
+    cache_valid_time: 3600
+    autoclean: yes
+    autoremove: yes
+  become: yes
+
+- name: Check to see if we need a reboot (Debian)
+  when: ansible_os_family == "Debian"
+  stat:
+    path: /var/run/reboot-required
+  register: needs_restart_debian_result
+  changed_when: needs_restart_debian_result.stat.exists
+
+- name: Upgrade RHEL Family OS packages
+  when: ansible_os_family == "RedHat"
+  yum:
+    name: '*'
+    state: latest
+  become: yes
+
+- name: Check to see if we need a reboot (RedHat)
+  when: ansible_os_family == "RedHat"
+  command: needs-restarting --reboothint
+  register: needs_restart_redhat_result
+  failed_when: needs_restart_redhat_result.rc > 1
+  changed_when: needs_restart_redhat_result.rc == 1
+
+- name: Reboot if needed
+  reboot:
+  become: yes
+  when: needs_restart_redhat_result.changed or needs_restart_debian_result.changed

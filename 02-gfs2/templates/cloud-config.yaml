@@ -6,8 +6,6 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh-authorized-keys:
       ${ssh-key}
-preserve_hostname: false
-fqdn: ${hostname}.otus
 timezone: "Europe/Moscow"
 ntp:
   enabled: true

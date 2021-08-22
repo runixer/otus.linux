@@ -19,15 +19,25 @@ variable "zone" {
   description = "Yandex.Cloud availability zone"
 }
 
-variable "image_id" {
-  type = string
-  #default = "fd8vmcue7aajpmeo39kk" # Ubuntu 20.04
-  default = "fd85ck0tjp72cp9jiqbi" # CentOS 7
-  description = "The ID of the existing disk, default is CentOS 7"
+variable "gvfs2_count" {
+  type = number
+  default = 3
+  description = "Count of gvfs2 client instances"
 }
 
 variable "username" {
   type = string
   default = "otus"
   description = "Username to use for ssh"
+}
+
+variable "ssh_pubkey" {
+  type = string
+  description = "SSH public key"
+}
+
+variable "image_id" {
+  type = string
+  default = "fd8hnbln4tn9k0823esa"  # centos-stream-8-v20210818
+  description = "The ID of the existing disk, default is CentOS 8 Stream"
 }

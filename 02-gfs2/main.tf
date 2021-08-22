@@ -15,6 +15,7 @@ provider "yandex" {
 
 resource "yandex_compute_instance" "bastion" {
   name = "bastion"
+  hostname = "bastion"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -26,24 +27,19 @@ resource "yandex_compute_instance" "bastion" {
   }
   boot_disk {
     initialize_params {
-      image_id = "fd8drj7lsj7btotd7et5" # Yandex NAT Instance (Ubuntu)
+      image_id = "fd8drj7lsj7btotd7et5" # Yandex NAT Instance (nat-instance-ubuntu-1612818947)
     }
-  }
-  network_interface {
-    subnet_id = yandex_vpc_subnet.otus-public.id
-    nat       = true
   }
   network_interface {
     subnet_id = yandex_vpc_subnet.otus-mgmt.id
     ip_address = "192.168.11.254"
-    nat       = false
+    nat       = true
   }
   metadata = {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
       username=var.username,
-      ssh-key=file("~/.ssh/id_ed25519.pub"),
-      hostname="bastion"
+      ssh-key=var.ssh_pubkey
     })
   }
   connection {
@@ -52,18 +48,11 @@ resource "yandex_compute_instance" "bastion" {
     agent = true
     host  = self.network_interface.0.nat_ip_address
   }
-  # TODO: Some hack to enable second interface
-  provisioner "remote-exec" {
-    inline = [
-      "sudo ip li set dev eth1 up",
-      "sudo ip addr add dev eth1 192.168.11.254/24"
-    ]
-  }
 }
 
 resource "yandex_compute_instance" "iscsi" {
-  count = 1
-  name = "iscsi-${count.index}"
+  name = "iscsi"
+  hostname = "iscsi"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -78,6 +67,11 @@ resource "yandex_compute_instance" "iscsi" {
       image_id = var.image_id
     }
   }
+  secondary_disk {
+    disk_id = yandex_compute_disk.iscsi-disk.id
+    device_name = yandex_compute_disk.iscsi-disk.name
+    auto_delete = false
+  }
   network_interface {
     subnet_id = yandex_vpc_subnet.otus-mgmt.id
     nat       = false
@@ -86,8 +80,7 @@ resource "yandex_compute_instance" "iscsi" {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
       username=var.username,
-      ssh-key=file("~/.ssh/id_ed25519.pub"),
-      hostname="iscsi-${count.index}"
+      ssh-key=var.ssh_pubkey
     })
   }
   connection {
@@ -95,6 +88,7 @@ resource "yandex_compute_instance" "iscsi" {
     user  = var.username
     agent = true
     host  = self.network_interface.0.ip_address
+    # Since there is no public ip, connecting through bastion host
     bastion_host = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
   }
   provisioner "remote-exec" {
@@ -102,9 +96,16 @@ resource "yandex_compute_instance" "iscsi" {
   }
 }
 
+resource "yandex_compute_disk" "iscsi-disk" {
+  name = "isci-disk"
+  size = 20
+  type = "network-hdd"
+}
+
 resource "yandex_compute_instance" "gvfs2" {
-  count = 1
+  count = var.gvfs2_count
   name = "gvfs2-${count.index}"
+  hostname = "gvfs2-${count.index}"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -127,8 +128,7 @@ resource "yandex_compute_instance" "gvfs2" {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
       username=var.username,
-      ssh-key=file("~/.ssh/id_ed25519.pub"),
-      hostname="gvfs2-${count.index}"
+      ssh-key=var.ssh_pubkey
     })
   }
   connection {
@@ -168,7 +168,7 @@ resource "yandex_vpc_route_table" "route-public" {
 
   static_route {
     destination_prefix = "0.0.0.0/0"
-    next_hop_address   = "192.168.1.254"
+    next_hop_address   = "192.168.11.254"
   }
 }
 
@@ -177,8 +177,8 @@ resource "local_file" "ansible_inventory" {
     {
       bastion_ip = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
       bastion_name = yandex_compute_instance.bastion.name
-      iscsi = yandex_compute_instance.iscsi.*
-      gvfs2 = yandex_compute_instance.gvfs2.*
+      iscsi = yandex_compute_instance.iscsi.fqdn
+      gvfs2 = yandex_compute_instance.gvfs2.*.fqdn
       username = var.username
     }
   )
@@ -187,11 +187,18 @@ resource "local_file" "ansible_inventory" {
 
 resource "null_resource" "ansible-install" {
   provisioner "local-exec" {
-    command = "ANSIBLE_CONFIG=ansible/ansible.cfg ansible -i ${local_file.ansible_inventory.filename} all -m ping"
+    command = "ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ${local_file.ansible_inventory.filename} ansible/playbook.yaml"
+  }
+}
+
+# replace bastion ip in /etc/hosts on terraform machine and remove from known_hosts
+resource "null_resource" "hosts" {
+  provisioner "local-exec" {
+    command = "sudo sed -i '/${yandex_compute_instance.bastion.name}/ s/.*/${yandex_compute_instance.bastion.network_interface.0.nat_ip_address} ${yandex_compute_instance.bastion.name}/g' /etc/hosts; ssh-keygen -R ${yandex_compute_instance.bastion.name}"
   }
 }
 
 output "external_ip_address_bastion" {
   value = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
-  description = "External IP of ready iscsi instance"
+  description = "External IP of ready bastion instance"
 }

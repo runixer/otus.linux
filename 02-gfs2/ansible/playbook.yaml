@@ -1,9 +1,24 @@
-- hosts: iscsi
+- hosts: all
   roles:
-    - common
-    - iscsi
+    - upgrade
+
+- hosts: iscsi
+  become: true
+  vars:
+    iscsi_iqn: 'iqn.2021-08.ru.otus'
+    iscsi_blockname: 'otus-iscsi'
+  roles:
+    - {role: 'iscsi-target', tags: ['iscsi', 'iscsi-target']}
 
 - hosts: gvfs2
+  vars:
+    pacemaker_hacluster_name: 'otusha'
+    pacemaker_hacluster_user: 'hacluster'
+    pacemaker_hacluster_password: 'haPASS1804'
+    pacemaker_hacluster_sha: '$6$65ZVK3CdSgjLeHOF$vl3r.cjQukU..qQnU5BhIsDFwrCorxUvMY1A83dX8KriWjDqFBevxdmpaS0CjFUYqbesUvQ51SornyHmjppcA/'
+    iscsi_iqn: 'iqn.2021-08.ru.otus'
+  become: true
   roles:
-    - common
-    - gvfs2
+    - {role: 'iscsi-initiator', tags: ['iscsi', 'iscsi-initiator']}
+    - {role: 'corosync', tags: ['corosync']}
+    - {role: 'gvfs2', tags: ['gvfs2']}
