@@ -1,0 +1,9 @@
+- hosts: iscsi
+  roles:
+    - common
+    - iscsi
+
+- hosts: gvfs2
+  roles:
+    - common
+    - gvfs2

@@ -1,0 +1,17 @@
+- name: Upgrade RHEL Family OS packages
+  yum:
+    name: '*'
+    state: latest
+  become: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Check to see if we need a reboot
+  command: needs-restarting --reboothint
+  register: needs_restart_result
+  failed_when: needs_restart_result.rc > 1
+  changed_when: needs_restart_result.rc == 1
+
+- name: Reboot if needed
+  reboot:
+  become: yes
+  when: needs_restart_result.changed
