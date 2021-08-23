@@ -7,15 +7,16 @@ terraform {
 }
 
 provider "yandex" {
-  cloud_id  = var.cloud_id
-  folder_id = var.folder_id
-  zone      = var.zone
-  token     = var.yc_token
+  cloud_id                 = var.cloud_id
+  folder_id                = var.folder_id
+  zone                     = var.zone
+  service_account_key_file = var.yc_service_account_key_file
+  token                    = var.yc_token
 }
 
 resource "yandex_compute_instance" "bastion" {
-  name = "bastion"
-  hostname = "bastion"
+  name                      = "bastion"
+  hostname                  = "bastion"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -31,15 +32,15 @@ resource "yandex_compute_instance" "bastion" {
     }
   }
   network_interface {
-    subnet_id = yandex_vpc_subnet.otus-mgmt.id
+    subnet_id  = yandex_vpc_subnet.otus-mgmt.id
     ip_address = "192.168.11.254"
-    nat       = true
+    nat        = true
   }
   metadata = {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
-      username=var.username,
-      ssh-key=var.ssh_pubkey
+      username = var.username,
+      ssh-key  = var.ssh_pubkey
     })
   }
   connection {
@@ -51,8 +52,8 @@ resource "yandex_compute_instance" "bastion" {
 }
 
 resource "yandex_compute_instance" "iscsi" {
-  name = "iscsi"
-  hostname = "iscsi"
+  name                      = "iscsi"
+  hostname                  = "iscsi"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -68,7 +69,7 @@ resource "yandex_compute_instance" "iscsi" {
     }
   }
   secondary_disk {
-    disk_id = yandex_compute_disk.iscsi-disk.id
+    disk_id     = yandex_compute_disk.iscsi-disk.id
     device_name = yandex_compute_disk.iscsi-disk.name
     auto_delete = false
   }
@@ -79,8 +80,8 @@ resource "yandex_compute_instance" "iscsi" {
   metadata = {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
-      username=var.username,
-      ssh-key=var.ssh_pubkey
+      username = var.username,
+      ssh-key  = var.ssh_pubkey
     })
   }
   connection {
@@ -103,9 +104,9 @@ resource "yandex_compute_disk" "iscsi-disk" {
 }
 
 resource "yandex_compute_instance" "gvfs2" {
-  count = var.gvfs2_count
-  name = "gvfs2-${count.index}"
-  hostname = "gvfs2-${count.index}"
+  count                     = var.gvfs2_count
+  name                      = "gvfs2-${count.index}"
+  hostname                  = "gvfs2-${count.index}"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -127,8 +128,8 @@ resource "yandex_compute_instance" "gvfs2" {
   metadata = {
     # https://cloud.yandex.ru/docs/compute/concepts/vm-metadata
     user-data = templatefile("templates/cloud-config.yaml", {
-      username=var.username,
-      ssh-key=var.ssh_pubkey
+      username = var.username,
+      ssh-key  = var.ssh_pubkey
     })
   }
   connection {
@@ -175,11 +176,11 @@ resource "yandex_vpc_route_table" "route-public" {
 resource "local_file" "ansible_inventory" {
   content = templatefile("templates/ansible-inventory.ini",
     {
-      bastion_ip = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
+      bastion_ip   = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
       bastion_name = yandex_compute_instance.bastion.name
-      iscsi = yandex_compute_instance.iscsi.fqdn
-      gvfs2 = yandex_compute_instance.gvfs2.*.fqdn
-      username = var.username
+      iscsi        = yandex_compute_instance.iscsi.fqdn
+      gvfs2        = yandex_compute_instance.gvfs2.*.fqdn
+      username     = var.username
     }
   )
   filename = "ansible/inventory.ini"
@@ -199,6 +200,6 @@ resource "null_resource" "hosts" {
 }
 
 output "external_ip_address_bastion" {
-  value = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
+  value       = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
   description = "External IP of ready bastion instance"
 }

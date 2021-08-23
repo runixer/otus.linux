@@ -54,6 +54,7 @@
   command: vgchange --lock-start svg0
   when: (inventory_hostname != play_hosts[0]) and (hostvars[groups.gvfs2[0]].vgcreate_result.changed)
 
+# TODO: fix rc=5, stderr: "Cannot access VG svg0 due to failed lock." after deleting and recreating gvfs2 instances and remove ignore_errors
 - name: lvcreate
   command: lvcreate --activate sy  -l+100%FREE -n lv0 svg0
   when: inventory_hostname == play_hosts[0]
@@ -62,6 +63,7 @@
     - result.rc != 0 and "Calculated size of logical volume is 0 extents" not in result.stderr
   changed_when:
     - '"Calculated size of logical volume is 0 extents" not in result.stderr'
+  ignore_errors: true
 
 - name: mkfs.gvfs2
   command: mkfs.gfs2 -O -j{{ groups['gvfs2'] | length }} -p lock_dlm -t {{ pacemaker_hacluster_name }}:lv0 /dev/svg0/lv0
