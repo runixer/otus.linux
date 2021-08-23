@@ -1,3 +1,10 @@
+# Pacemaker cluster setup
+#  https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_high_availability_clusters/index
+#  https://github.com/ClusterLabs/pcs
+#  https://github.com/ClusterLabs/pacemaker
+# TODO: Research: replace separate pcs cli commands with xml templating.
+# TODO: This file is CentOS8 specific, separate to CentOS8.yaml from main.yaml
+
 - name: Install pacemaker, pcs
   dnf:
     name:
@@ -7,7 +14,6 @@
       - pcp-zeroconf
     enablerepo:
       - ha
-      - rs
     state: present
 
 - name: Enable pcsd service
@@ -22,17 +28,20 @@
     password: "{{ pacemaker_hacluster_sha }}"
   become: true
 
+# TODO: rewrite to use "pcs cluster cib" or "pcs config"
 - name: Get pcs status
   command: pcs status
   register: pcs_status
   changed_when: false
   failed_when: '(pcs_status.rc != 0) and ("Error: cluster is not available on this node" not in pcs_status.stderr)'
 
+# TODO: replace with separate commands for every node on every node
 - name: Pcs host auth
   when: inventory_hostname not in pcs_status.stdout
   command: pcs host auth {{ groups['gvfs2']|join(' ') }} -u {{ pacemaker_hacluster_user }} -p  {{ pacemaker_hacluster_password }}
   ignore_errors: true
 
+# TODO: remove failed_when / changed_when, add --enable
 - name: Pcs cluster setup
   command: pcs cluster setup {{ pacemaker_hacluster_name }} --start {{ groups['gvfs2']|join(' ') }}
   when: (inventory_hostname == play_hosts[0]) and ("Cluster Summary" not in pcs_status.stdout)
@@ -42,6 +51,7 @@
   changed_when:
     - '"The host seems to be in a cluster" not in result.stderr'
 
+# TODO: Replace with adding --enable to "Pcs cluster setup" step
 - name: Pcs cluster enable
   when: >
     ("corosync: active/enabled" not in pcs_status.stdout) or
@@ -49,6 +59,7 @@
     ("pcsd: active/enabled" not in pcs_status.stdout)
   command: pcs cluster enable --all
 
+# TODO: Merge with "Get pcs status"
 - name: Pcs get properties
   command: pcs property show
   when: inventory_hostname == play_hosts[0]
@@ -63,6 +74,7 @@
   when: '(inventory_hostname == play_hosts[0]) and ("stonith-enabled: true" not in pcs_property_result.stdout)'
   command: pcs property set stonith-enabled=true
 
+# TODO: Create fence for Yandex Cloud
 - name: Pcs create dummy fence
   copy:
     src: files/fence_dummy.py
@@ -71,6 +83,7 @@
     group: root
     mode: '0755'
 
+# TODO: Fix "when" with use of "Get pcs status". Remove failed_when, changed_when
 - name: Pcs enable dummy fencing
   command: pcs stonith create fence_dummy fence_dummy
   when: inventory_hostname == play_hosts[0]
