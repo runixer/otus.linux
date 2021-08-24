@@ -52,8 +52,8 @@ resource "yandex_compute_instance" "bastion" {
 }
 
 resource "yandex_compute_instance" "iscsi" {
-  name                      = "iscsi"
-  hostname                  = "iscsi"
+  name                      = "iscsi-t"
+  hostname                  = "iscsi-t"
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -107,6 +107,7 @@ resource "yandex_compute_instance" "gvfs2" {
   count                     = var.gvfs2_count
   name                      = "gvfs2-${count.index}"
   hostname                  = "gvfs2-${count.index}"
+  service_account_id = yandex_iam_service_account.sa_corosync.id
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -173,14 +174,27 @@ resource "yandex_vpc_route_table" "route-public" {
   }
 }
 
+# Yandex.Cloud Service account for corosync fence
+resource "yandex_iam_service_account" "sa_corosync" {
+  name        = "otus-corosync"
+  description = "service account for corosync fence"
+}
+
+resource "yandex_resourcemanager_folder_iam_member" "otus-compute-admin-corosync" {
+  folder_id =var.folder_id
+
+  role   = "compute.admin"
+  member = format("serviceAccount:%s", yandex_iam_service_account.sa_corosync.id)
+}
+
 resource "local_file" "ansible_inventory" {
   content = templatefile("templates/ansible-inventory.ini",
     {
-      bastion_ip   = yandex_compute_instance.bastion.network_interface.0.nat_ip_address
-      bastion_name = yandex_compute_instance.bastion.name
-      iscsi        = yandex_compute_instance.iscsi.fqdn
-      gvfs2        = yandex_compute_instance.gvfs2.*.fqdn
-      username     = var.username
+      bastion   = yandex_compute_instance.bastion
+      iscsi     = yandex_compute_instance.iscsi
+      gvfs2     = yandex_compute_instance.gvfs2.*
+      username  = var.username
+      yc_folder = var.folder_id
     }
   )
   filename = "ansible/inventory.ini"

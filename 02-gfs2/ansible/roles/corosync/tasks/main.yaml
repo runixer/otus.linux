@@ -83,9 +83,50 @@
     group: root
     mode: '0755'
 
+# Fence for Yandex Cloud
+- name: Install dependencies for yandexcloud pip package
+  dnf:
+    name:
+      - python39
+      - python39-devel
+      - python39-pip
+      - python39-wheel
+      - python39-six
+      - python39-cryptography
+      - python39-requests
+      - gcc
+      - openssl-devel
+      - libcurl-devel
+    enablerepo:
+      - appstream
+    state: present
+
+- name: Make python3.9 default
+  alternatives:
+    name: python3
+    path: /usr/bin/python3.9
+
+- name: Install yandexcloud python package
+  pip:
+    name:
+      - pycurl
+      - pexpect
+      - yandexcloud
+
+- name: Copy yandexcloud corosync fence script
+  copy:
+    src: files/fence_yc.py
+    dest: /usr/sbin/fence_yc
+    owner: root
+    group: root
+    mode: '0700'
+  tags: 'yandex-cloud'
+
 # TODO: Fix "when" with use of "Get pcs status". Remove failed_when, changed_when
-- name: Pcs enable dummy fencing
-  command: pcs stonith create fence_dummy fence_dummy
+- name: Enable yandex cloud fencing
+  command: >
+    pcs stonith create fence_yc fence_yc folder={{ yc_folder_id }}
+    pcmk_host_map="{% for host in ansible_play_hosts %}{{ hostvars[host].inventory_hostname }}:{{ hostvars[host].yc_instance_id }};{% endfor %}"
   when: inventory_hostname == play_hosts[0]
   register: result
   failed_when:

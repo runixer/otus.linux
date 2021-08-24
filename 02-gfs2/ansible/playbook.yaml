@@ -1,4 +1,11 @@
-- hosts: all
+# Upgrade bastion first
+- hosts: bastion
+  become: true
+  roles:
+    - upgrade
+
+- hosts: all:!bastion
+  become: true
   roles:
     - upgrade
 

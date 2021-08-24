@@ -14,13 +14,14 @@
     path: /var/run/reboot-required
   register: needs_restart_debian_result
   changed_when: needs_restart_debian_result.stat.exists
+  notify: reboot
 
-- name: Upgrade RHEL Family OS packages
-  when: ansible_os_family == "RedHat"
-  yum:
-    name: '*'
+- name: Update all software (dnf)
+  ansible.builtin.dnf:
+    name: "*"
     state: latest
-  become: yes
+  when:
+    - ansible_pkg_mgr == "dnf"
 
 - name: Check to see if we need a reboot (RedHat)
   when: ansible_os_family == "RedHat"
@@ -28,8 +29,4 @@
   register: needs_restart_redhat_result
   failed_when: needs_restart_redhat_result.rc > 1
   changed_when: needs_restart_redhat_result.rc == 1
-
-- name: Reboot if needed
-  reboot:
-  become: yes
-  when: needs_restart_redhat_result.changed or needs_restart_debian_result.changed
+  notify: reboot

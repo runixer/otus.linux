@@ -8,8 +8,8 @@
 - name: Change iqn
   lineinfile:
     path: /etc/iscsi/initiatorname.iscsi
-    regexp: '^InitiatorName=.*'
-    line: 'InitiatorName={{ iscsi_iqn }}:{{ inventory_hostname }}'
+    regexp: "^InitiatorName=.*"
+    line: "InitiatorName={{ iscsi_iqn }}:{{ inventory_hostname }}"
   register: iqn
 
 - name: Restart iscsi on iqn change

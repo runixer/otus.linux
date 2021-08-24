@@ -1,0 +1,5 @@
+- name: Reboot
+  reboot:
+  become: yes
+  listen: reboot
+  any_errors_fatal: true
