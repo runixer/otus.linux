@@ -107,7 +107,7 @@ resource "yandex_compute_instance" "gvfs2" {
   count                     = var.gvfs2_count
   name                      = "gvfs2-${count.index}"
   hostname                  = "gvfs2-${count.index}"
-  service_account_id = yandex_iam_service_account.sa_corosync.id
+  service_account_id        = yandex_iam_service_account.sa_corosync.id
   allow_stopping_for_update = true
   resources {
     cores         = 2
@@ -181,10 +181,9 @@ resource "yandex_iam_service_account" "sa_corosync" {
 }
 
 resource "yandex_resourcemanager_folder_iam_member" "otus-compute-admin-corosync" {
-  folder_id =var.folder_id
-
-  role   = "compute.admin"
-  member = format("serviceAccount:%s", yandex_iam_service_account.sa_corosync.id)
+  folder_id = var.folder_id
+  role      = "compute.admin"
+  member    = format("serviceAccount:%s", yandex_iam_service_account.sa_corosync.id)
 }
 
 resource "local_file" "ansible_inventory" {
@@ -206,7 +205,7 @@ resource "null_resource" "ansible-install" {
   }
 }
 
-# replace bastion ip in /etc/hosts on terraform machine and remove from known_hosts
+# replace bastion ip in /etc/hosts and remove from ssh known_hosts
 resource "null_resource" "hosts" {
   provisioner "local-exec" {
     command = "sudo sed -i '/${yandex_compute_instance.bastion.name}/ s/.*/${yandex_compute_instance.bastion.network_interface.0.nat_ip_address} ${yandex_compute_instance.bastion.name}/g' /etc/hosts; ssh-keygen -R ${yandex_compute_instance.bastion.name}"
