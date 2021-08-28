@@ -1,0 +1,11 @@
+# Upgrade bastion first
+- hosts: bastion
+  become: yes
+  become_method: sudo
+  roles:
+    - upgrade
+
+- hosts: all:!bastion
+  become: true
+  roles:
+    - upgrade

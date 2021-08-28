@@ -1,0 +1,11 @@
+- name: Upgrade Red Hat Family OS packages
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+
+- name: Check to see if we need a reboot (RedHat)
+  command: needs-restarting --reboothint
+  register: needs_restart_redhat_result
+  failed_when: needs_restart_redhat_result.rc > 1
+  changed_when: needs_restart_redhat_result.rc == 1
+  notify: reboot
