@@ -5,7 +5,7 @@ This terraform module creates:
 * 1 mysql database instance (db-0)
 * Specified number of app instances with wordpress and php_fpm role
 * Specified number of nginx instances with wordpress and nginx role
-* 1 Yandex Cloud load balancer trageting nginx instances
+* 1 Yandex Cloud load balancer targeting nginx instances
 
 Features:
 * No TLS at this time

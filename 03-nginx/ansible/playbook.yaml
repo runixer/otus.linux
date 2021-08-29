@@ -1,13 +1,13 @@
-# #Upgrade bastion first
-# - hosts: bastion
-#   become: yes
-#   roles:
-#     - upgrade
+#Upgrade bastion first
+- hosts: bastion
+  become: yes
+  roles:
+    - upgrade
 
-# - hosts: all:!bastion
-#   become: yes
-#   roles:
-#     - upgrade
+- hosts: all:!bastion
+  become: yes
+  roles:
+    - upgrade
 
 - hosts: db
   become: yes
@@ -20,8 +20,8 @@
     wp_files_owner: apache
     wp_files_group: apache
   roles:
-    - wordpress
     - php_fpm
+    - wordpress
 
 - hosts: nginx
   become: yes
@@ -30,5 +30,5 @@
     wp_files_owner: nginx
     wp_files_group: nginx
   roles:
-    - wordpress
     - nginx
+    - wordpress
