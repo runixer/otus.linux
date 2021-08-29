@@ -1,0 +1,24 @@
+- name: Install nginx
+  ansible.builtin.dnf:
+    name:
+      - nginx
+    state: present
+
+- name: Set httpd_can_network_relay flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_relay
+    state: yes
+    persistent: yes
+
+- name: Configure nginx core
+  ansible.builtin.copy:
+    src: files/nginx.conf
+    dest: /etc/nginx/nginx.conf
+  notify: reload_nginx
+
+- name: Configure nginx upstreams
+  ansible.builtin.template:
+    src: templates/upstreams.conf
+    dest: /etc/nginx/conf.d/upstreams.conf
+  notify: reload_nginx
+  tags: nginx

@@ -1,0 +1,16 @@
+
+- name: Upload dump
+  ansible.builtin.template:
+    src: ../../dump.sql
+    dest: /tmp/dump.sql
+  register: upload_dump
+  listen: restore_dump
+
+- name: Restore dump
+  community.mysql.mysql_db:
+    state: import
+    name: wordpress
+    encoding: latin1
+    target: /tmp/dump.sql
+  listen: restore_dump
+  any_errors_fatal: true

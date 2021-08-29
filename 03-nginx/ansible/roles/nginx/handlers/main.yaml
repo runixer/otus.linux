@@ -1,0 +1,7 @@
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+    enabled: yes
+  listen: reload_nginx
+  any_errors_fatal: true

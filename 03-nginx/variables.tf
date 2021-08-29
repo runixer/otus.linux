@@ -28,8 +28,14 @@ variable "zone" {
 
 variable "nginx_count" {
   type        = number
-  default     = 3
+  default     = 2
   description = "Count of nginx node instances"
+}
+
+variable "app_count" {
+  type        = number
+  default     = 2
+  description = "Count of app node instances"
 }
 
 variable "username" {

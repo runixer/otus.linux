@@ -1,0 +1,55 @@
+- name: Enable epel repo GPG key
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+    state: present
+
+- name: Enable remi repo GPG key
+  rpm_key:
+    key: https://rpms.remirepo.net/RPM-GPG-KEY-remi2020
+    state: present
+
+- name: Enable epel and remi repos
+  ansible.builtin.dnf:
+    name:
+      - https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+      - https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    state: present
+
+- name: Install nginx, php
+  ansible.builtin.dnf:
+    name:
+      - '@php:remi-8.0'
+      - php-fpm
+      - php-mysqlnd
+      - php-json
+      - php-dom
+      - php-mbstring
+      - php-zip
+      - php-gd
+      - php-xml
+      - php-pecl-imagick
+    state: present
+
+- name: Configure php-fpm
+  ansible.builtin.copy:
+    src: files/php-fpm.conf
+    dest: /etc/php-fpm.d/wordpress.conf
+  notify: reload_phpfpm
+
+- name: Add load balancer to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: '{{ external_ip }} otus.internal'
+    state: present
+
+- name: Set httpd_can_network_connect_db flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect_db
+    state: yes
+    persistent: yes
+
+- name: Set httpd_can_network_connect flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: yes
+    persistent: yes

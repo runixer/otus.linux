@@ -1,11 +1,34 @@
-# Upgrade bastion first
-- hosts: bastion
-  become: yes
-  become_method: sudo
-  roles:
-    - upgrade
+# #Upgrade bastion first
+# - hosts: bastion
+#   become: yes
+#   roles:
+#     - upgrade
 
-- hosts: all:!bastion
-  become: true
+# - hosts: all:!bastion
+#   become: yes
+#   roles:
+#     - upgrade
+
+- hosts: db
+  become: yes
   roles:
-    - upgrade
+    - wordpress_db
+
+- hosts: app
+  become: yes
+  vars:
+    wp_files_owner: apache
+    wp_files_group: apache
+  roles:
+    - wordpress
+    - php_fpm
+
+- hosts: nginx
+  become: yes
+  vars:
+    upstreams: "{{ groups['app'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
+    wp_files_owner: nginx
+    wp_files_group: nginx
+  roles:
+    - wordpress
+    - nginx

@@ -1,0 +1,24 @@
+- name: Install keepalived
+  ansible.builtin.dnf:
+    name: keepalived
+    state: present
+
+- name: Install keepalived config
+  ansible.builtin.template:
+    src: templates/keepalived.conf
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: '0644'
+  vars:
+    keepalived_role: "{% if ansible_play_hosts.index(inventory_hostname) == 0 %}MASTER{% else %}BACKUP{% endif %}"
+    keepalived_priority: "{{ 200 - ansible_play_hosts.index(inventory_hostname) }}"
+    keepalived_srcip: "{{ ansible_host }}"
+    keepalived_peers: "{{ ansible_play_hosts | map('extract', hostvars, ['ansible_host']) | flatten  | difference([ansible_host]) }}"
+  notify: restart
+
+- name: Enable keepalived service
+  ansible.builtin.systemd:
+    name: keepalived
+    state: started
+    enabled: yes
