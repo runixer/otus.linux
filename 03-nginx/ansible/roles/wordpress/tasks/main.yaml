@@ -32,6 +32,15 @@
     setype: httpd_sys_rw_content_t
     remote_src: yes
 
+- name: Download and extract wordpress plugin - Disable WordPress Events and News Dashboard Widget
+  ansible.builtin.unarchive:
+    src: https://downloads.wordpress.org/plugin/disable-events-and-news-dashboard-widget.1.0.zip
+    dest: /var/www/wordpress/wp-content/plugins
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    remote_src: yes
+
 - name: Download favicon
   ansible.builtin.get_url:
     url: https://otus.ru/favicon.ico
