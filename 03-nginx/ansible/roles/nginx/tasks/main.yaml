@@ -14,14 +14,8 @@
     path: "/etc/pki/otus/{{ inventory_hostname }}.csr"
     privatekey_path: "/etc/pki/otus/{{ inventory_hostname }}.pem"
     common_name: "{{ inventory_hostname }}"
-    subject_alt_name: "{{ item.value | map('regex_replace', '^', 'DNS:') | list }}"
-  with_dict:
-    dns_server:
-    - otus.internal
-    - "{{ inventory_hostname }}"
-    - "{{ external_ip }}"
-    - "{{ ansible_host }}"
-    - localhost
+    subject_alt_name: "DNS:otus.internal,DNS:{{ inventory_hostname }},IP:{{ external_ip }},IP:{{ ansible_host }}"
+  notify: reload_nginx
   tags: cert
 
 - name: Generate an OpenSSL certificate signed with your own CA certificate
@@ -31,6 +25,7 @@
     provider: ownca
     ownca_content: "{{ ca }}"
     ownca_privatekey_content: "{{ cakey }}"
+  notify: reload_nginx
   tags: cert
 
 - name: Install nginx
