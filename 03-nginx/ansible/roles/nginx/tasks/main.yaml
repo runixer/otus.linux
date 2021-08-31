@@ -15,7 +15,7 @@
     privatekey_path: "/etc/pki/otus/{{ inventory_hostname }}.pem"
     common_name: "{{ inventory_hostname }}"
     subject_alt_name: "DNS:otus.internal,DNS:{{ inventory_hostname }},IP:{{ external_ip }},IP:{{ ansible_host }}"
-  notify: reload_nginx
+  notify: reload_openresty
   tags: cert
 
 - name: Generate an OpenSSL certificate signed with your own CA certificate
@@ -25,30 +25,71 @@
     provider: ownca
     ownca_content: "{{ ca }}"
     ownca_privatekey_content: "{{ cakey }}"
-  notify: reload_nginx
+  notify: reload_openresty
   tags: cert
 
-- name: Install nginx
+- name: Enable CentOS openresty repo
+  ansible.builtin.yum_repository:
+    name: openresty
+    description: "Official OpenResty Open Source Repository for {{ ansible_distribution }}"
+    baseurl: "https://openresty.org/package/{{ ansible_distribution|lower }}/$releasever/$basearch"
+    skip_if_unavailable: False
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://openresty.org/package/pubkey.gpg
+    enabled: yes
+  tags: openresty
+
+- name: Add openresty yum key
+  ansible.builtin.rpm_key:
+    key: "https://openresty.org/package/pubkey.gpg"
+    state: present
+  register: import_key
+  tags: openresty
+
+#- name: Import openresty yum key (prevent verification prompt)
+#  command: "yum -q makecache -y --disablerepo='*' --enablerepo='openresty'"
+#  when: import_key.changed
+#  tags: openresty
+
+- name: Install openresty
   ansible.builtin.dnf:
     name:
-      - nginx
+      - openresty
     state: present
+  tags: openresty
+
+- name: Make dir for nginx logs
+  ansible.builtin.file:
+    path: /var/log/nginx
+    owner: nobody
+    state: directory
+  tags: openresty
 
 - name: Set httpd_can_network_relay flag on and keep it persistent across reboots
   ansible.posix.seboolean:
     name: httpd_can_network_relay
     state: yes
     persistent: yes
+  tags: openresty
 
-- name: Configure nginx core
-  ansible.builtin.copy:
-    src: files/nginx.conf
-    dest: /etc/nginx/nginx.conf
-  notify: reload_nginx
+- name: Configure nginx/openresty - main
+  ansible.builtin.template:
+    src: templates/nginx.conf
+    dest: /usr/local/openresty/nginx/conf/nginx.conf
+  notify: reload_openresty
+  tags: openresty
 
-- name: Configure nginx upstreams
+- name: Configure nginx/openresty - upstreams
   ansible.builtin.template:
     src: templates/upstreams.conf
-    dest: /etc/nginx/conf.d/upstreams.conf
-  notify: reload_nginx
-  tags: nginx
+    dest: /usr/local/openresty/nginx/conf/upstreams.conf
+  notify: reload_openresty
+  tags: openresty
+
+- name: Enable nginx/openresty service
+  ansible.builtin.systemd:
+    name: openresty
+    state: started
+    enabled: yes
+  tags: openresty

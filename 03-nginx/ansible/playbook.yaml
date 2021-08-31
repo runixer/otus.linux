@@ -29,8 +29,8 @@
   become: yes
   vars:
     upstreams: "{{ groups['app'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
-    wp_files_owner: nginx
-    wp_files_group: nginx
+    wp_files_owner: nobody
+    wp_files_group: nobody
   roles:
     - nginx
     - wordpress
