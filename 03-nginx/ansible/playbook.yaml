@@ -2,11 +2,13 @@
 - hosts: bastion
   become: yes
   roles:
+    - tune_all
     - upgrade
 
 - hosts: all:!bastion
   become: yes
   roles:
+    - tune_all
     - upgrade
 
 - hosts: db

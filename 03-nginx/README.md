@@ -23,10 +23,11 @@ Notes:
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-community.mysql and ansible.posix ansible collections:
+Some ansible collections:
 ```sh
 ansible-galaxy collection install community.mysql
 ansible-galaxy collection install ansible.posix
+ansible-galaxy collection install community.crypto
 ```
 
 ## Providers

@@ -1,0 +1,16 @@
+- hosts: db[0]
+  become: true
+  tasks:
+
+  - name: Upload dump
+    ansible.builtin.template:
+      src: dump.sql
+      dest: /tmp/dump.sql
+
+  - name: Restore dump
+    community.mysql.mysql_db:
+      state: import
+      name: wordpress
+      encoding: latin1
+      target: /tmp/dump.sql
+    any_errors_fatal: true

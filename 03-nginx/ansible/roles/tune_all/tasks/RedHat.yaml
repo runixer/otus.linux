@@ -1,0 +1,7 @@
+- name: Install CA pem file (Red Hat)
+  ansible.builtin.copy:
+    content: "{{ ca }}"
+    dest: "/etc/pki/ca-trust/source/anchors/ca-otus.pem"
+  notify: ca_redhat
+  tags: cert
+

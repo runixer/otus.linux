@@ -237,8 +237,16 @@ resource "yandex_lb_network_load_balancer" "lb" {
   name = "lb1"
 
   listener {
-    name = "my-listener"
+    name = "http-listener"
     port = 80
+    external_address_spec {
+      ip_version = "ipv4"
+    }
+  }
+
+  listener {
+    name = "https-listener"
+    port = 443
     external_address_spec {
       ip_version = "ipv4"
     }
