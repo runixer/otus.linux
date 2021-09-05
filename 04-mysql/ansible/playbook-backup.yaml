@@ -1,0 +1,21 @@
+- hosts: db[0]
+  become: true
+  tasks:
+
+  # - name: Dump database
+  #   community.mysql.mysql_db:
+  #     state: dump
+  #     name: wordpress
+  #     target: /tmp/dump.sql
+
+  # - name: Replace external ip with template
+  #   ansible.builtin.replace:
+  #     path: /tmp/dump.sql
+  #     regexp: "{{ external_ip }}"
+  #     replace: "{% raw %}{{ external_ip }}{% endraw %}"
+
+  # - name: Download dump
+  #   ansible.builtin.fetch:
+  #     src: /tmp/dump.sql
+  #     dest: dump.sql
+  #     flat: yes

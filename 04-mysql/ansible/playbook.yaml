@@ -1,0 +1,51 @@
+#Upgrade bastion first
+- hosts: bastion
+  become: yes
+  roles:
+    - tune_all
+#    - upgrade
+
+- hosts: all:!bastion
+  become: yes
+  roles:
+    - tune_all
+#    - upgrade
+
+- hosts: db
+  become: yes
+  roles:
+    - innodb_cluster
+  tags:
+    - db
+
+- hosts: app
+  become: yes
+  vars:
+    wp_files_owner: apache
+    wp_files_group: apache
+    mysqlrouter_bootstrap_server_url: "{{ innodb_cluster_user_name }}:{{ innodb_cluster_user_password }}@{{ groups['db'][0] }}"
+    wp_db_host: "localhost:{{ mysqlrouter_socket }}"
+  roles:
+    - php_fpm
+    - wordpress
+    - mysql_router
+
+# Create wordpress database
+- hosts: app[0]
+  become: yes
+  vars:
+    mysql_socket: "{{ mysqlrouter_socket }}"
+    mysql_username: "{{ innodb_cluster_user_name }}"
+    mysql_password: "{{ innodb_cluster_user_password }}"
+  roles:
+    - wordpress_mysqldb
+
+- hosts: nginx
+  become: yes
+  vars:
+    upstreams: "{{ groups['app'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
+    wp_files_owner: nobody
+    wp_files_group: nobody
+  roles:
+    - nginx
+    - wordpress

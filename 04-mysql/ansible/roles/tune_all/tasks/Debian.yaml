@@ -1,0 +1,7 @@
+- name: Install CA pem file (Debian, Ubuntu)
+  ansible.builtin.copy:
+    content: "{{ ca }}"
+    dest: "/usr/local/share/ca-certificates/ca-otus.pem"
+  notify: ca_debian
+  tags: cert
+

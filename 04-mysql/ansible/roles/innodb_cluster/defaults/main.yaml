@@ -1,0 +1,11 @@
+mysql_data_path: /var/lib/mysql
+mysql_service_user: mysql
+mysql_service_group: mysql
+
+mysql_root_user: root
+mysql_root_password: My!qlPassw0rd
+
+innodb_cluster_user_name: clusteradmin
+innodb_cluster_user_password: InnoD6P!ssw0rd
+innodb_cluster_name: innodbcluster
+innodb_cluster_primary_node: localhost

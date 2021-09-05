@@ -1,0 +1,10 @@
+- name: Template bootstrapping js for mysqlsh
+  template:
+    dest: "{{ mysql_data_path }}/bootstrap_cluster.js"
+    src: templates/bootstrap_cluster.js.j2
+    owner: "{{ mysql_service_user }}"
+    group: "{{ mysql_service_group }}"
+    mode: '0600'
+
+- name: Bootstrap the cluster (new deployment)
+  command: mysqlsh -f {{ mysql_data_path }}/bootstrap_cluster.js
