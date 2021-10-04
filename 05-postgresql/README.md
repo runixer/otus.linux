@@ -371,7 +371,7 @@ ansible-galaxy collection install community.postgresql
 
 #### external_ip_address_bastion
 
-Описание: Внешний IP-адрес сервера bastioninstance
+Описание: Внешний IP-адрес сервера bastion
 
 #### external_ip_address_lb
 
