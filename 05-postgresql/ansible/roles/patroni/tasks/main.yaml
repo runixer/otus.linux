@@ -1,0 +1,92 @@
+---
+
+# Epel required for python3-certifi
+- name: Enable epel repo GPG key
+  ansible.builtin.rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+    state: present
+
+- name: Enable epel repo
+  ansible.builtin.dnf:
+    name:
+      - https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    state: present
+
+# Official Postgresql repos
+- name: Enable Postgresql 13 repo
+  ansible.builtin.yum_repository:
+    name: postgresql-13
+    description: "Official PostgreSQL Repository for CentOS 8 - PostgreSQL 13"
+    baseurl: "https://download.postgresql.org/pub/repos/yum/{{ patroni_postgresql_version }}/redhat/rhel-8-x86_64/"
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    enabled: yes
+
+- name: Enable Postgresql common repo
+  ansible.builtin.yum_repository:
+    name: postgresql-common
+    description: "Official PostgreSQL Repository for CentOS 8 - Common"
+    baseurl: "https://download.postgresql.org/pub/repos/yum/common/redhat/rhel-8-x86_64/"
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    enabled: yes
+
+- name: Disable Centos 8 postgresql dnf module
+  command: dnf module disable postgresql -y
+  args:
+    warn: false
+  register: result
+  changed_when: '"Nothing to do." not in result.stdout'
+
+- name: Install postgresql 13 and patroni
+  ansible.builtin.dnf:
+    name:
+      - patroni-etcd
+      - "postgresql{{ patroni_postgresql_version }}"
+      - "postgresql{{ patroni_postgresql_version }}-server"
+      - python3-psycopg2 # Required for ansible-postgresql
+
+- name: Add postgresql to PATH for users
+  ansible.builtin.template:
+    src: profile.sh.j2
+    dest: "/etc/profile.d/pgsql-{{ patroni_postgresql_version }}.sh"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add postgresql to PATH for patroni
+  ansible.builtin.template:
+    src: patroni_env.conf.j2
+    dest: "/etc/patroni_env.conf"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create patroni config directory
+  ansible.builtin.file:
+    path: "{{ patroni_config_dir }}"
+    state: directory
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0750
+
+- name: Add postgres user to tls-cert group
+  ansible.builtin.user:
+    name: postgres
+    groups:
+      - tls-cert
+    append: yes
+
+- name: Create patrioni config file from template
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: "{{ patroni_config_dir }}/{{ patroni_config_file }}"
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: '0600'
+  notify:
+    - restart patroni

@@ -1,0 +1,15 @@
+[Unit]
+Description=ConfD service
+After=network.target
+After=pgbouncer.service
+
+[Service]
+ExecStart="{{ confd_home }}"/confd -confdir /etc/confd/
+Type=simple
+User=root
+Group=root
+TimeoutSec=30
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

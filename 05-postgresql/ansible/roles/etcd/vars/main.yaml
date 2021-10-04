@@ -1,0 +1,21 @@
+---
+etcd_platform: '{{ etcd_os }}-{{ etcd_arch }}'
+etcd_name: etcd-{{ etcd_version }}-{{ etcd_platform }}
+etcd_archive: '{{ etcd_name }}.{{ etcd_archive_suffix|default("tar.gz") }}'
+etcd_tmp_archive: /tmp/{{ etcd_archive }}
+
+etcd_archive_url: '{{ etcd_mirror }}/{{ etcd_version }}/{{ etcd_archive }}'
+etcd_checksum: '{{ etcd_checksums[etcd_version][etcd_platform] }}'
+
+etcd_install_subdir: '{{ etcd_install_dir }}/{{ etcd_name }}'
+
+
+etcd_scheme: "{% if etcd_secure %}https{% else %}http{% endif %}://"
+etcd_cluster: "{% for host in play_hosts %}{{ hostvars[host]['ansible_fqdn'] }}={{ etcd_scheme }}{{ hostvars[host]['etcd_address_cluster'] }}:{{ etcd_port_peer }}{% if not loop.last %},{% endif %}{% endfor %}"
+
+etcd_cluster_data_dir: '{{ etcd_data_dir }}/{{ etcd_cluster_name }}.etcd'
+
+pki_key_file: '/etc/pki/otus/{{ inventory_hostname }}.pem'
+pki_cert_file: '/etc/pki/otus/{{ inventory_hostname }}.crt'
+pki_csr_file: '/etc/pki/otus/{{ inventory_hostname }}.csr'
+pki_ca_file: '/etc/pki/ca-trust/source/anchors/ca-otus.pem'

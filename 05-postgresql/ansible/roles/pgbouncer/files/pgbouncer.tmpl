@@ -1,0 +1,15 @@
+[databases]
+{{with get "/leader"}}{{$leader := .Value}}{{$leadkey := printf "/members/%s" $leader}}{{with get $leadkey}}{{$data := json .Value}}{{$hostport := base (replace (index (split $data.conn_url "/") 2) "@" "/" -1)}}{{ $host := base (index (split $hostport ":") 0)}}{{ $port := base (index (split $hostport ":") 1)}}* = host={{ $host }} port={{ $port }} pool_size=10 user=postgres password=zalando {{end}}{{end}}
+
+[pgbouncer]
+pidfile = /var/run/pgbouncer/pgbouncer.pid
+# Joomla doesn't work with socket
+unix_socket_dir = 
+#unix_socket_dir = /var/run/pgbouncer
+listen_addr = 127.0.0.1
+# Joomla doesn't work with any other than 5432 ports
+listen_port = 5432
+auth_type = any
+pool_mode = session
+max_client_conn = 100
+default_pool_size = 20

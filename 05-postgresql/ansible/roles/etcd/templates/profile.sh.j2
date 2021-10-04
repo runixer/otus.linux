@@ -1,0 +1,12 @@
+PATH=/usr/local/bin/:$PATH
+export PATH
+ETCDCTL_CERT={{ pki_cert_file }}
+export ETCDCTL_CERT
+ETCDCTL_KEY={{ pki_key_file }}
+export ETCDCTL_KEY
+ETCDCTL_CACERT={{ pki_ca_file }}
+export ETCDCTL_CACERT
+
+ETCDCTL_ENDPOINTS={% for host in play_hosts %}{{ etcd_scheme }}{{ hostvars[host]['inventory_hostname'] }}:{{ etcd_port_client }}{% if not loop.last %},{% endif %}{% endfor %}
+
+export ETCDCTL_ENDPOINTS

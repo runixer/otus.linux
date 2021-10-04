@@ -1,0 +1,8 @@
+---
+confd_version: 0.16.0
+confd_name: "confd-{{ confd_version }}-linux-amd64"
+confd_download: https://github.com/kelseyhightower/confd/releases/download/v{{ confd_version }}/{{ confd_name }}
+confd_home: /usr/local/bin/
+confd_config: /etc/confd
+
+postgresql_version: 13

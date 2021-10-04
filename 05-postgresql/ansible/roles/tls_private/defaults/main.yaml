@@ -1,0 +1,4 @@
+---
+
+pki_common_name: "{{ inventory_hostname }}"
+pki_subject_alt_name: "DNS:{{ inventory_hostname }},IP:{{ ansible_host }},IP:127.0.0.1"

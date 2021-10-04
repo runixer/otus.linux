@@ -1,0 +1,15 @@
+- name: Restart confd service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: confd
+    enabled: true
+    state: restarted
+  listen: "restart confd"
+
+- name: Restart pgbouncer service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: pgbouncer
+    enabled: true
+    state: restarted
+  listen: "restart confd"

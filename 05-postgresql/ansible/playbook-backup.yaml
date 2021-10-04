@@ -1,0 +1,22 @@
+- hosts: app[0]
+  become: true
+  tasks:
+
+  - name: Dump database
+    community.postgresql.postgresql_db:
+      name: "{{ db_name }}"
+      state: dump
+      target: /tmp/dump.sql
+      port: 5432
+      login_host : localhost
+
+  - name: Download dump
+    ansible.builtin.fetch:
+      src: /tmp/dump.sql
+      dest: dump.sql
+      flat: yes
+
+  - name: Remove dump
+    ansible.builtin.file:
+      path: /tmp/dump.sql
+      state: absent

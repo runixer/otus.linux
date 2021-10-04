@@ -1,0 +1,33 @@
+- name: Install unzip
+  ansible.builtin.dnf:
+    name:
+      - unzip
+    state: present
+
+- name: Creates directory for joomla
+  ansible.builtin.file:
+    path: /var/www/joomla
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    state: directory
+
+- name: Download and extract Joomla
+  ansible.builtin.unarchive:
+    src: "{{ item }}"
+    dest: /var/www/joomla
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    remote_src: yes
+    exclude:
+      - installation  # Exclude doesn't work with zip archives
+  with_items:
+    - https://downloads.joomla.org/cms/joomla4/4-0-3/Joomla_4-0-3-Stable-Full_Package.tar.gz?format=tar.gz
+    - https://downloads.joomla.org/language-packs/translations-joomla4/downloads/joomla4-russian/4-0-3-1/ru-ru_joomla_lang_full_4-0-3v1-zip?format=zip
+
+- name: Configure joomla
+  ansible.builtin.template:
+    src: templates/configuration.php.j2
+    dest: /var/www/joomla/configuration.php
+  tags: joomla

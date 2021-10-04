@@ -1,0 +1,9 @@
+- name: Update CA Trust (Red Hat)
+  command: update-ca-trust
+  listen: ca_redhat
+  tags: cert
+
+- name: Update CA Trust (Debian, Ubuntu)
+  command: update-ca-certificates
+  listen: ca_debian
+  tags: cert

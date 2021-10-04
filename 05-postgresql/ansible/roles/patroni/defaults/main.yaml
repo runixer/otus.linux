@@ -1,0 +1,14 @@
+---
+
+patroni_postgresql_version: 13
+
+patroni_config_dir: /etc/patroni
+patroni_config_file: patroni.yml
+patroni_system_user: postgres
+patroni_system_group: postgres
+
+# TLS
+pki_key_file: '/etc/pki/otus/{{ inventory_hostname }}.pem'
+pki_cert_file: '/etc/pki/otus/{{ inventory_hostname }}.crt'
+pki_csr_file: '/etc/pki/otus/{{ inventory_hostname }}.csr'
+pki_ca_file: '/etc/pki/ca-trust/source/anchors/ca-otus.pem'

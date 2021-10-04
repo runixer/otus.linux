@@ -1,0 +1,15 @@
+backend = "etcdv3"
+
+client_cert = "{{ pki_cert_file }}"
+client_key = "{{ pki_key_file }}"
+client_cakeys = "{{ pki_ca_file }}"
+
+#log-level = "debug"
+interval = 10
+watch = true
+
+nodes = [
+  {% for server in etcd_servers %}
+  "https://{{ server }}:2379",
+  {% endfor %}
+]

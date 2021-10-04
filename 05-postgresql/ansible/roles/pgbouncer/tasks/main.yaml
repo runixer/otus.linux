@@ -1,0 +1,102 @@
+# Official Postgresql repos
+- name: "Enable Postgresql {{ postgresql_version }} repo"
+  ansible.builtin.yum_repository:
+    name: "postgresql-{{ postgresql_version }}"
+    description: "Official PostgreSQL Repository for CentOS 8 - PostgreSQL 13"
+    baseurl: "https://download.postgresql.org/pub/repos/yum/{{ postgresql_version }}/redhat/rhel-8-x86_64/"
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    enabled: yes
+
+- name: Enable Postgresql common repo
+  ansible.builtin.yum_repository:
+    name: postgresql-common
+    description: "Official PostgreSQL Repository for CentOS 8 - Common"
+    baseurl: "https://download.postgresql.org/pub/repos/yum/common/redhat/rhel-8-x86_64/"
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    enabled: yes
+
+- name: Disable Centos 8 postgresql dnf module
+  command: dnf module disable postgresql -y
+  args:
+    warn: false
+  register: result
+  changed_when: '"Nothing to do." not in result.stdout'
+
+- name: Install pgbouncer and psql
+  ansible.builtin.dnf:
+    name:
+      - pgbouncer
+      - "postgresql{{ postgresql_version }}"
+
+- name: Download confd
+  ansible.builtin.get_url:
+    url: "{{ confd_download }}"
+    dest: "{{ confd_home }}/confd"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Create confd directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0750
+  loop:
+    - /etc/confd/conf.d
+    - /etc/confd/templates
+
+- name: Generate conf file "/etc/confd/confd.toml"
+  ansible.builtin.template:
+    src: confd.toml.j2
+    dest: /etc/confd/confd.toml
+  notify: "restart confd"
+
+- name: Create pgbouncer.toml
+  ansible.builtin.copy:
+    src: files/pgbouncer.toml
+    dest:  /etc/confd/conf.d/pgbouncer.toml
+    owner: root
+    group: root
+    mode: 0750
+  notify: "restart confd"
+
+- name: Create pgbouncer.tmpl
+  ansible.builtin.copy:
+    src: files/pgbouncer.tmpl
+    dest: /etc/confd/templates/pgbouncer.tmpl
+    owner: root
+    group: root
+    mode: 0750
+  notify: "restart confd"
+
+- name: Create confd service file
+  ansible.builtin.template:
+    src: confd.service.j2
+    dest: /etc/systemd/system/confd.service
+    owner: root
+    group: root
+    mode: 644
+    setype: systemd_unit_file_t
+  notify: "restart confd"
+
+- name: Enable confd service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: confd
+    enabled: true
+    state: started
+
+- name: Enable pgbouncer service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: pgbouncer
+    enabled: true
+    state: started

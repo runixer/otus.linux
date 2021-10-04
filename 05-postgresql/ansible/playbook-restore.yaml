@@ -1,0 +1,34 @@
+- hosts: app[0]
+  become: true
+  tasks:
+
+  - name: Upload dump
+    ansible.builtin.copy:
+      src: dump.sql
+      dest: /tmp/dump.sql
+      owner: pgbouncer
+      group: pgbouncer
+      mode: '0600'
+
+  - name: Create database
+    community.postgresql.postgresql_db:
+      name: "{{ db_name }}"
+      port: 5432
+      login_host : localhost
+
+  - name: Create user and restore from dump
+    community.postgresql.postgresql_db:
+      name: "{{ db_name }}"
+      target: "{{ item }}"
+      state: restore
+      port: 5432
+      login_host : localhost
+    with_items:
+      - /tmp/dump.sql
+
+  - name: Remove db init and dump
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    with_items:
+      - /tmp/dump.sql

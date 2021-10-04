@@ -1,0 +1,109 @@
+---
+- name: Collect facts
+  set_fact:
+    cacheable: yes
+    etcd_listen_public: '{{ "0.0.0.0" if etcd_iface_public == "all" else ansible_default_ipv4.address if etcd_iface_public == "default" else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_public]["ipv4"]["address"] }}'
+    etcd_listen_cluster: '{{ "0.0.0.0" if etcd_iface_cluster == "all" else ansible_default_ipv4.address if etcd_iface_cluster == "default" else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_cluster]["ipv4"]["address"] }}'
+    etcd_address_public: '{{ ansible_fqdn if not etcd_use_ips | bool else ansible_default_ipv4.address if etcd_iface_public is in [ "all", "default" ] else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_public]["ipv4"]["address"] }}'
+    etcd_address_cluster: '{{ ansible_fqdn if not etcd_use_ips | bool else ansible_default_ipv4.address if etcd_iface_cluster is in [ "all", "default" ] else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_cluster]["ipv4"]["address"] }}'
+
+- name: check for installation in {{ etcd_install_subdir }}
+  become: yes
+  stat:
+    path: '{{ etcd_install_subdir }}'
+  changed_when: false
+  register: etcd_binary_dir
+
+- when: not etcd_binary_dir.stat.exists
+  block:
+    - name: downloading {{ etcd_archive_url }} to {{ etcd_tmp_archive }}
+      become: yes
+      become_user: root
+      get_url:
+        url: '{{ etcd_archive_url }}'
+        dest: '{{ etcd_tmp_archive }}'
+        checksum: '{{ etcd_checksum }}'
+        timeout: '{{ etcd_download_timeout_seconds }}'
+        mode: 0644
+    - name: unachive {{ etcd_tmp_archive }} to {{ etcd_install_dir }}
+      become: yes
+      become_user: root
+      unarchive:
+        remote_src: yes
+        src: '{{ etcd_tmp_archive }}'
+        dest: '{{ etcd_install_dir }}'
+        creates: '{{ etcd_install_subdir }}'
+  always:
+    - name: rm {{ etcd_tmp_archive }}
+      become: yes
+      become_user: root
+      file:
+        path: '{{ etcd_tmp_archive }}'
+        state: absent
+
+- name: linking etcd and etcdctl from {{ etcd_install_dir }} to {{ etcd_install_subdir }}
+  become: yes
+  become_user: root
+  file:
+    src: '{{ etcd_install_subdir }}/{{ item }}'
+    dest: '{{ etcd_install_dir }}/{{ item }}'
+    state: link
+  with_items:
+    - etcd{{ etcd_exe_suffix|default("") }}
+    - etcdctl{{ etcd_exe_suffix|default("") }}
+
+- name: create etcd group
+  become: yes
+  become_user: root
+  ansible.builtin.group:
+    name: '{{ etcd_group }}'
+    state: present
+
+- name: create etcd user
+  become: yes
+  become_user: root
+  ansible.builtin.user:
+    name: '{{ etcd_user }}'
+    group: '{{ etcd_group }}'
+    home: '{{ etcd_data_dir }}'
+    state: present
+
+- name: create dirs...
+  become: yes
+  become_user: root
+  file:
+    state: directory
+    path: '{{ item }}'
+    owner: '{{ etcd_user }}'
+    group: '{{ etcd_group }}'
+    mode: 0755
+  with_items:
+    - /etc/etcd
+
+- include_tasks: pki.yaml
+  when: etcd_secure | bool
+
+- name: install etcd.service configuration
+  become: yes
+  become_user: root
+  with_items:
+    - f: etcd.conf
+      d: /etc/etcd
+  template:
+    src: '{{ item.f }}.j2'
+    dest: '{{ item.d }}/{{ item.f }}'
+    owner: '{{ etcd_user }}'
+    group: '{{ etcd_group }}'
+    mode: 0644
+  notify:
+  - restart etcd
+
+- include_tasks: '{{ etcd_init_system }}.yaml'
+
+- name: Create etcd profile file with variables
+  ansible.builtin.template:
+    src: profile.sh.j2
+    dest: "/etc/profile.d/etcd.sh"
+    owner: root
+    group: root
+    mode: '0644'

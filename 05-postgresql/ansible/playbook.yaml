@@ -1,0 +1,46 @@
+#Upgrade bastion first
+- hosts: bastion
+  become: yes
+  roles:
+    - tune_all
+    - upgrade
+
+- hosts: all:!bastion
+  become: yes
+  roles:
+    - tune_all
+    - upgrade
+
+- hosts: db
+  become: yes
+  vars:
+    etcd_cluster_name: etcd-postgresql
+  roles:
+    - { role: etcd, tags: [etcd] }
+    - { role: patroni, tags: [patroni] }
+
+- hosts: app
+  become: yes
+  vars:
+    wp_files_owner: apache
+    wp_files_group: apache
+    pki_key_file: "/etc/pki/otus/{{ inventory_hostname }}.pem"
+    pki_cert_file: "/etc/pki/otus/{{ inventory_hostname }}.crt"
+    pki_csr_file: "/etc/pki/otus/{{ inventory_hostname }}.csr"
+    pki_ca_file: "/etc/pki/ca-trust/source/anchors/ca-otus.pem"
+    etcd_servers: "{{ groups['db'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+  roles:
+    - { role: tls_private, tags: [tls]}
+    - { role: pgbouncer, tags: [pgbouncer]}
+    - { role: php_fpm, tags: [php_fpm]}
+    - { role: joomla, tags: [joomla]}
+
+- hosts: nginx
+  become: yes
+  vars:
+    upstreams: "{{ groups['app'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
+    wp_files_owner: nobody
+    wp_files_group: nobody
+  roles:
+    - { role: nginx, tags: [nginx]}
+    - { role: joomla, tags: [joomla]}

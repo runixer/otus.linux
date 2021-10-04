@@ -1,0 +1,34 @@
+etcd_version: v3.5.0
+etcd_os: linux
+etcd_arch: amd64
+etcd_mirror: https://github.com/etcd-io/etcd/releases/download
+etcd_install_dir: /usr/local/bin
+
+etcd_download_timeout_seconds: 600
+
+etcd_checksums:
+  v3.5.0:
+    # https://github.com/etcd-io/etcd/releases/download/v3.5.0/etcd-v3.5.0-linux-amd64.tar.gz
+    linux-amd64: sha256:864baa0437f8368e0713d44b83afe21dce1fb4ee7dae4ca0f9dd5f0df22d01c4
+
+etcd_user: etcd
+etcd_group: etcd
+etcd_data_dir: /var/lib/etcd
+
+etcd_use_ips: True
+etcd_iface_public: '{{ etcd_network_iface | default("all") }}'
+etcd_iface_cluster: '{{ etcd_network_iface | default("default") }}'
+etcd_port_client: 2379
+etcd_port_peer: 2380
+
+etcd_cluster_name: test-cluster-name
+etcd_initial_cluster_token: d8bf8cc6-5158-11e6-8f13-3b32f4935bde
+
+etcd_init_system: systemd
+etcd_launch: True
+
+etcd_secure: True
+
+etcd_enable_v2: False # Accept etcd V2 client requests
+
+etcd_additional_envvars: {}

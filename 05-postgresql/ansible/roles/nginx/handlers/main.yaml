@@ -1,0 +1,7 @@
+- name: Reload nginx/openresty
+  ansible.builtin.systemd:
+    name: openresty
+    state: reloaded
+    enabled: yes
+  listen: reload_openresty
+  any_errors_fatal: true

@@ -1,0 +1,83 @@
+scope: main
+namespace: /db/
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: {{ ansible_host }}:8008
+  connect_address: {{ ansible_host }}:8008
+  certfile: {{ pki_cert_file }}
+  keyfile: {{ pki_key_file }}
+  cafile: {{ pki_ca_file }}
+  verify_client: true
+
+ctl:
+  insecure: false
+  certfile: {{ pki_cert_file }}
+  cacert: {{ pki_ca_file }}
+
+etcd3:
+  hosts: 127.0.0.1:2379
+  protocol: https
+  cacert: {{ pki_ca_file }}
+  cert: {{ pki_cert_file }}
+  key: {{ pki_key_file }}
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      parameters:
+        max_parallel_workers: 8
+        min_wal_size: 1GB
+        max_wal_size: 2GB
+        max_connections: 100
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+  pg_hba:
+  - host replication replicator 127.0.0.1/32 md5
+{% for host in play_hosts %}
+  - host replication replicator {{ hostvars[host]['ansible_host'] }}/32 md5
+{% endfor %}
+  - host all all 0.0.0.0/0 md5
+  users:
+    admin:
+      password: admin
+      options:
+        - createrole
+        - createdb
+
+postgresql:
+  listen: {{ ansible_host }}:5432
+  connect_address: {{ ansible_host }}:5432
+  data_dir: /var/lib/pgsql/13/data/
+  pgpass: /tmp/pgpass-{{ inventory_hostname }}
+  authentication:
+    replication:
+      username: replicator
+      password: rep-pass
+    superuser:
+      username: postgres
+      password: zalando
+  parameters:
+    unix_socket_directories: '.'
+    log_checkpoints: 'on'
+    log_duration: 'on'
+    log_hostname: 'off'
+    log_lock_waits: 'off'
+    log_statement: 'ddl'
+    log_temp_files: '0'
+    log_timezone: 'Europe/Moscow'
+    log_parser_stats: 'off'
+    log_executor_stats: 'off'
+    log_statement_stats: 'off'
+
+tags:
+    nofailover: false
+    noloadbalance: false
+    clonefrom: false
+    nosync: false

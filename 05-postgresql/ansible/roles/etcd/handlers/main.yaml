@@ -1,0 +1,14 @@
+---
+# handlers file for etcd-cluster
+
+# Restart etcd one-by-one to keep quorum
+- name: restart etcd
+  become: yes
+  become_user: root
+  when: etcd_launch | bool
+  service:
+    name: etcd
+    state: restarted
+  run_once: yes
+  loop: '{{ play_hosts }}'
+  delegate_to: '{{ item }}'
