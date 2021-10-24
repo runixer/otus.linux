@@ -58,7 +58,7 @@ Ansible-роль nginx была модифицирована:
 
 Ansible-роль vector собирает access и error журналы nginx из journald, access и error журналы php-fpm из файлов. Далее vector отправляет журналы в kafka.
 
-Для разворачивания kafka/logstash/elasticsearch/kibana/kafkaui была создана новая роль серверов - log. Количество экземпляров log-серверов регулируется через terraform-переменную log_count. Была проверена работоспособность при log_count=1 и log_count=3.
+Для разворачивания kafka/logstash/elasticsearch/kibana/kafkaui была создана новая роль серверов - log. Количество экземпляров log-серверов регулируется через terraform-переменную log_count. Была проверена работоспособность при log_count=0,1,3.
 
 Общая схема:
 

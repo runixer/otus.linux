@@ -33,6 +33,7 @@
   community.crypto.openssl_privatekey:
     path: "/etc/pki/otus/kibana.pem"
   tags: cert
+  when: kibana_nodes | length > 0
 
 - name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
   community.crypto.openssl_csr:
@@ -42,6 +43,7 @@
     subject_alt_name: "DNS:kibana.otus.internal"
   notify: reload_openresty
   tags: cert
+  when: kibana_nodes | length > 0
 
 - name: Generate an OpenSSL certificate signed with your own CA certificate
   community.crypto.x509_certificate:
@@ -52,12 +54,14 @@
     ownca_privatekey_content: "{{ cakey }}"
   notify: reload_openresty
   tags: cert
+  when: kibana_nodes | length > 0
 
 # Kafka UI
 - name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
   community.crypto.openssl_privatekey:
     path: "/etc/pki/otus/kafkaui.pem"
   tags: cert
+  when: kafkaui_nodes | length > 0
 
 - name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
   community.crypto.openssl_csr:
@@ -67,6 +71,7 @@
     subject_alt_name: "DNS:kafkaui.otus.internal"
   notify: reload_openresty
   tags: cert
+  when: kafkaui_nodes | length > 0
 
 - name: Generate an OpenSSL certificate signed with your own CA certificate
   community.crypto.x509_certificate:
@@ -77,6 +82,7 @@
     ownca_privatekey_content: "{{ cakey }}"
   notify: reload_openresty
   tags: cert
+  when: kafkaui_nodes | length > 0
 
 - name: Enable CentOS openresty repo
   ansible.builtin.yum_repository:

@@ -53,6 +53,6 @@ http {
   keepalive_timeout 65;
 
   include wordpress.conf;
-  include kibana.conf;
-  include kafkaui.conf;
+  {% if kibana_nodes|length >0 %}include kibana.conf;{% endif %}
+  {% if kafkaui_nodes|length >0 %}include kafkaui.conf;{% endif %}
 }

@@ -3,13 +3,13 @@
   become: yes
   roles:
     - { role: tune_all, tags: [tune_all] }
-    - { role: upgrade, tags: [upgrade] }
+#    - { role: upgrade, tags: [upgrade] }
 
 - hosts: all:!bastion
   become: yes
   roles:
     - { role: tune_all, tags: [tune_all] }
-    - { role: upgrade, tags: [upgrade] }
+#    - { role: upgrade, tags: [upgrade] }
 
 - hosts: log
   become: yes
@@ -24,25 +24,19 @@
     logstash_internal_user: { username: "logstash_internal", password: "changeMe" }
     logstash_admin_user: { username: "logstash_admin", password: "changeMe" }
   roles:
-    - { role: oraclejdk, tags: [oraclejdk]}
-    - { role: tls_private, tags: [tls_private]}
-    - { role: elasticsearch, tags: [elasticsearch]}
-    - { role: kibana, tags: [kibana]}
+    - { role: oraclejdk, tags: [oraclejdk] }
+    - { role: tls_private, tags: [tls_private] }
+    - { role: elasticsearch, tags: [elasticsearch] }
+    - { role: kibana, tags: [kibana] }
     - { role: zookeeper, tags: [zookeeper] }
     - { role: kafka, tags: [kafka] }
     - { role: logstash, tags: [logstash] }
-
-- hosts: log[0]
-  become: yes
-  roles:
-    - { role: kafkaui, tags: [kafkaui]}
+    - { role: kafkaui, tags: [kafkaui] }
 
 - hosts: db
   become: yes
   roles:
-    - innodb_cluster
-  tags:
-    - db
+    - { role: innodb_cluster, tags: [db] }
 
 - hosts: app
   become: yes
@@ -80,7 +74,7 @@
     # Upstreams
     upstreams: "{{ groups['app'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
     kibana_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
-    kafkaui_nodes: ["{{ hostvars[groups['log'][0]]['inventory_hostname'] }}"]
+    kafkaui_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
   roles:
     - { role: vector, tags: [vector], when: "(groups['log'] | length) > 0" }
     - { role: nginx, tags: [nginx] }
