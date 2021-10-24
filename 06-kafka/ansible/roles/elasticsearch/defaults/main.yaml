@@ -1,0 +1,11 @@
+elastic_clustername: otus-elasticsearch
+
+elastic_pki_key_file: "/etc/elasticsearch/{{ inventory_hostname }}.pem"
+elastic_pki_csr_file: "/etc/elasticsearch/{{ inventory_hostname }}.csr"
+elastic_pki_cert_file: "/etc/elasticsearch/{{ inventory_hostname }}.crt"
+elastic_pki_ca_file: /etc/elasticsearch/ca-otus.pem
+
+es_api_basic_auth_username: elastic
+es_api_basic_auth_password: changeme
+
+es_port_api: 9200

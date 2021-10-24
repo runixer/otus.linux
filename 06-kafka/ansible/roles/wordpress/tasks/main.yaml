@@ -1,0 +1,61 @@
+- name: Install unzip
+  ansible.builtin.dnf:
+    name:
+      - unzip
+    state: present
+
+- name: Creates directory for wordpress
+  ansible.builtin.file:
+    path: /var/www
+    state: directory
+
+- name: Download and extract latest version of wordpress
+  ansible.builtin.unarchive:
+    src: https://wordpress.org/latest.tar.gz
+    dest: /var/www
+    exclude:
+      - wordpress/wp-content/plugins/akismet
+      - wordpress/wp-content/plugins/hello.php
+      - wordpress/wp-content/themes/twentynineteen
+      - wordpress/wp-content/themes/twentytwenty
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    remote_src: yes
+  retries: 3
+  delay: 3
+  register: result
+  until: result is not failed
+
+- name: Download and extract wordpress plugin - Health Endpoint
+  ansible.builtin.unarchive:
+    src: https://downloads.wordpress.org/plugin/health-endpoint.1.0.1.zip
+    dest: /var/www/wordpress/wp-content/plugins
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    remote_src: yes
+  retries: 3
+  delay: 3
+  register: result
+  until: result is not failed
+
+- name: Download and extract wordpress plugin - Disable WordPress Events and News Dashboard Widget
+  ansible.builtin.unarchive:
+    src: https://downloads.wordpress.org/plugin/disable-events-and-news-dashboard-widget.1.0.zip
+    dest: /var/www/wordpress/wp-content/plugins
+    owner: "{{ wp_files_owner }}"
+    group: "{{ wp_files_group }}"
+    setype: httpd_sys_rw_content_t
+    remote_src: yes
+
+- name: Download favicon
+  ansible.builtin.get_url:
+    url: https://otus.ru/favicon.ico
+    dest: /var/www/wordpress/favicon.ico
+
+- name: Configure wordpress
+  ansible.builtin.template:
+    src: templates/wp-config.php
+    dest: /var/www/wordpress/wp-config.php
+  tags: wordpress_conf

@@ -1,0 +1,99 @@
+- name: Enable epel repo GPG key
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+    state: present
+
+- name: Enable remi repo GPG key
+  rpm_key:
+    key: https://rpms.remirepo.net/RPM-GPG-KEY-remi2020
+    state: present
+
+- name: Enable epel and remi repos
+  ansible.builtin.dnf:
+    name:
+      - https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+      - https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    state: present
+
+- name: Install php
+  ansible.builtin.dnf:
+    name:
+      - '@php:remi-8.0'
+      - php-fpm
+      - php-mysqlnd
+      - php-json
+      - php-dom
+      - php-mbstring
+      - php-zip
+      - php-gd
+      - php-xml
+      - php-pecl-imagick
+      # Since php can write log only to a file
+      - logrotate
+    state: present
+
+- name: Configure logrotate
+  ansible.builtin.copy:
+    src: files/logrotate.conf
+    dest: /etc/logrotate.d/php-fpm
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Configure php-fpm
+  ansible.builtin.copy:
+    src: files/php-fpm.conf
+    dest: /etc/php-fpm.d/www.conf
+  tags: php_conf
+  notify: reload_phpfpm
+
+- name: Set httpd_can_network_connect_db flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect_db
+    state: yes
+    persistent: yes
+
+- name: Set httpd_can_network_connect flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: yes
+    persistent: yes
+
+- name: Change log directory permissions (allow reading for adm group)
+  ansible.builtin.file:
+    path: /var/log/php-fpm
+    state: directory
+    owner: apache
+    group: adm
+    mode: 0750
+  notify: reload_phpfpm
+
+- name: Change log files permissions (allow reading for adm group)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: touch
+    modification_time: preserve
+    owner: root
+    group: adm
+    mode: 0640
+  with_items:
+    - /var/log/php-fpm/access.log
+    - /var/log/php-fpm/error.log
+    - /var/log/php-fpm/slow.log
+  notify: reload_phpfpm
+
+- name: Change log files permissions (allow reading for adm group)
+  ansible.builtin.file:
+    path: /var/log/php-fpm/www-error.log
+    state: touch
+    modification_time: preserve
+    owner: apache
+    group: adm
+    mode: 0640
+  notify: reload_phpfpm
+
+- name: Enable php-fpm systemd service
+  ansible.builtin.systemd:
+    name: php-fpm
+    state: started
+    enabled: yes

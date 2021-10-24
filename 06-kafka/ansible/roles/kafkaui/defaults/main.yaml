@@ -1,0 +1,14 @@
+kafkaui_version: 0.2.1
+kafkaui_jar: kafka-ui-api-{{ kafkaui_version }}.jar
+kafkaui_url: https://github.com/provectus/kafka-ui/releases/download/v{{ kafkaui_version }}/{{ kafkaui_jar }}
+
+kafkaui_group: kafkaui
+kafkaui_user: kafkaui
+
+kafkaui_root_dir: /opt
+kafkaui_dir: '{{ kafkaui_root_dir }}/kafkaui'
+kafkaui_data_dir: /var/lib/kafkaui
+kafkaui_file: '{{ kafkaui_dir }}/kafka-ui-api.jar'
+
+kafkaui_port: 8081
+zookeeper_port_client: 2181

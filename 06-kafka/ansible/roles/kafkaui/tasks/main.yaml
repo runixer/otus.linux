@@ -1,0 +1,63 @@
+- name: Create kafkaui group
+  ansible.builtin.group:
+    name: "{{ kafkaui_group }}"
+    state: present
+
+- name: Create kafkaui user
+  ansible.builtin.user:
+    name: "{{ kafkaui_user }}"
+    group: "{{ kafkaui_group }}"
+    home: "{{ kafkaui_data_dir }}"
+    shell: /sbin/nologin
+    comment: Kafka UI
+    state: present
+    createhome: no
+
+- name: Create Kafka UI dir {{ kafkaui_dir }}
+  ansible.builtin.file:
+    path: "{{ kafkaui_dir }}"
+    state: directory
+    group: root
+    owner: root
+    mode: 0755
+
+- name: Create Kafka UI data dir {{ kafkaui_data_dir }}
+  ansible.builtin.file:
+    path: "{{ kafkaui_data_dir }}"
+    state: directory
+    group: "{{ kafkaui_group }}"
+    owner: "{{ kafkaui_user }}"
+    mode: 0755
+
+- name: Check if Kafka UI has already been downloaded
+  ansible.builtin.stat:
+    path: "{{ kafkaui_dir }}/{{ kafkaui_jar }}"
+  register: kafkaui_jar_file
+
+- name: Download Kafka UI
+  ansible.builtin.get_url:
+    url: "{{ kafkaui_url }}"
+    dest: "{{ kafkaui_dir }}"
+    group: root
+    owner: root
+    mode: 0755
+  when: not kafkaui_jar_file.stat.exists
+
+- name: Create symlink to Kafka UI jar file
+  ansible.builtin.file:
+    src: "{{ kafkaui_jar }}"
+    dest: "{{ kafkaui_file }}"
+    state: link
+    group: root
+    owner: root
+
+- name: Create Kafka UI systemd service file from template
+  ansible.builtin.template:
+    src: kafkaui.service.j2
+    dest: /etc/systemd/system/kafkaui.service
+    owner: root
+    group: root
+    mode: '0644'
+    setype: systemd_unit_file_t
+  notify:
+    - restart kafkaui

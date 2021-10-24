@@ -1,0 +1,2 @@
+elastic_port_client: 9200
+kibana_port_client: 5601

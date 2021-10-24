@@ -1,0 +1,132 @@
+- name: Create kafka group
+  ansible.builtin.group:
+    name: "{{ kafka_group }}"
+    state: present
+
+- name: Create kafka user
+  ansible.builtin.user:
+    name: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    home: "{{ kafka_data_dir }}"
+    shell: /sbin/nologin
+    comment: Apache Kafka
+    state: present
+    createhome: no
+
+- name: Check if Kafka has already been downloaded and unpacked
+  ansible.builtin.stat:
+    path: "{{ kafka_install_dir }}"
+  register: dir
+
+- name: Download Apache Kafka
+  ansible.builtin.get_url:
+    url: "{{ kafka_mirror }}/{{ kafka_version }}/{{ kafka_package }}"
+    dest: /tmp
+  when: not dir.stat.exists
+
+- name: Create Kafka installation dir {{ kafka_install_dir }}
+  ansible.builtin.file:
+    path: "{{ kafka_install_dir }}"
+    state: directory
+    group: root
+    owner: root
+    mode: 0755
+  when: not dir.stat.exists
+
+- name: Unpack Apache Kafka
+  ansible.builtin.unarchive:
+    src: /tmp/{{ kafka_package }}
+    dest: "{{ kafka_install_dir }}"
+    copy: no
+    extra_opts: [--strip-components=1]
+    exclude:
+      - bin/windows
+    group: root
+    owner: root
+  when: not dir.stat.exists
+
+- name: Create symlink to Kafka installation
+  ansible.builtin.file:
+    src: "{{ kafka_install_dir }}"
+    dest: "{{ kafka_dir }}"
+    state: link
+    group: root
+    owner: root
+
+- name: Create data directory
+  ansible.builtin.file:
+    path: "{{ kafka_data_dir }}"
+    state: directory
+    group: "{{ kafka_group }}"
+    owner: "{{ kafka_user }}"
+    mode: 0755
+
+- name: Create directory for log files
+  ansible.builtin.file:
+    path: "{{ kafka_log_dir }}"
+    state: directory
+    group: "{{ kafka_group }}"
+    owner: "{{ kafka_user }}"
+    mode: 0755
+
+- name: Create conf dir symlink to /etc
+  ansible.builtin.file:
+    src: "{{ kafka_dir }}/config"
+    dest: "{{ kafka_config_dir }}"
+    state: link
+    group: root
+    owner: root
+
+- name: Create kafka systemd service file from template
+  ansible.builtin.template:
+    src: kafka.service.j2
+    dest: /etc/systemd/system/kafka.service
+    owner: root
+    group: root
+    mode: '0644'
+    setype: systemd_unit_file_t
+  notify:
+    - restart kafka
+
+- name: Create kafka.properties config file from template
+  ansible.builtin.template:
+    src: kafka.properties.j2
+    dest: "{{ kafka_config_dir }}/{{ kafka_config_file }}"
+    owner: root
+    group: kafka
+    mode: '0640'
+    setype: etc_t
+  notify:
+    - restart kafka
+
+- name: Create kafka profile file with variables
+  ansible.builtin.template:
+    src: profile.sh.j2
+    dest: "/etc/profile.d/kafka.sh"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Start kafka service
+  ansible.builtin.systemd:
+    name: kafka.service
+    state: started
+    daemon_reload: yes
+    enabled: yes
+
+- name: Create topics
+  command:
+    cmd: |
+      {{ kafka_dir }}/bin/kafka-topics.sh
+        -create --topic {{ item }}
+        --replication-factor {{ kafka_rfactor }}
+        --partitions 2
+        --bootstrap-server localhost:9092
+  register: kafka_topics_result
+  changed_when: kafka_topics_result.rc != 1 and "already exists." not in kafka_topics_result.stdout
+  failed_when: kafka_topics_result.rc != 0 and "already exists." not in kafka_topics_result.stdout
+  when: inventory_hostname == play_hosts[0]
+  with_items:
+    - nginx
+    - wordpress
+  tags: kafka_topic

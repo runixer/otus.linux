@@ -1,0 +1,147 @@
+- name: Make dir for cert
+  ansible.builtin.file:
+    path: /etc/pki/otus
+    state: directory
+  tags: cert
+
+- name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+  community.crypto.openssl_privatekey:
+    path: "/etc/pki/otus/{{ inventory_hostname }}.pem"
+  tags: cert
+
+- name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
+  community.crypto.openssl_csr:
+    path: "/etc/pki/otus/{{ inventory_hostname }}.csr"
+    privatekey_path: "/etc/pki/otus/{{ inventory_hostname }}.pem"
+    common_name: "{{ inventory_hostname }}"
+    subject_alt_name: "DNS:otus.internal,DNS:{{ inventory_hostname }},IP:{{ external_ip }},IP:{{ ansible_host }}"
+  notify: reload_openresty
+  tags: cert
+
+- name: Generate an OpenSSL certificate signed with your own CA certificate
+  community.crypto.x509_certificate:
+    path: "/etc/pki/otus/{{ inventory_hostname }}.crt"
+    csr_path: "/etc/pki/otus/{{ inventory_hostname }}.csr"
+    provider: ownca
+    ownca_content: "{{ ca }}"
+    ownca_privatekey_content: "{{ cakey }}"
+  notify: reload_openresty
+  tags: cert
+
+# Kibana
+- name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+  community.crypto.openssl_privatekey:
+    path: "/etc/pki/otus/kibana.pem"
+  tags: cert
+
+- name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
+  community.crypto.openssl_csr:
+    path: "/etc/pki/otus/kibana.csr"
+    privatekey_path: "/etc/pki/otus/kibana.pem"
+    common_name: kibana.otus.internal
+    subject_alt_name: "DNS:kibana.otus.internal"
+  notify: reload_openresty
+  tags: cert
+
+- name: Generate an OpenSSL certificate signed with your own CA certificate
+  community.crypto.x509_certificate:
+    path: "/etc/pki/otus/kibana.crt"
+    csr_path: "/etc/pki/otus/kibana.csr"
+    provider: ownca
+    ownca_content: "{{ ca }}"
+    ownca_privatekey_content: "{{ cakey }}"
+  notify: reload_openresty
+  tags: cert
+
+# Kafka UI
+- name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+  community.crypto.openssl_privatekey:
+    path: "/etc/pki/otus/kafkaui.pem"
+  tags: cert
+
+- name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
+  community.crypto.openssl_csr:
+    path: "/etc/pki/otus/kafkaui.csr"
+    privatekey_path: "/etc/pki/otus/kafkaui.pem"
+    common_name: kafkaui.otus.internal
+    subject_alt_name: "DNS:kafkaui.otus.internal"
+  notify: reload_openresty
+  tags: cert
+
+- name: Generate an OpenSSL certificate signed with your own CA certificate
+  community.crypto.x509_certificate:
+    path: "/etc/pki/otus/kafkaui.crt"
+    csr_path: "/etc/pki/otus/kafkaui.csr"
+    provider: ownca
+    ownca_content: "{{ ca }}"
+    ownca_privatekey_content: "{{ cakey }}"
+  notify: reload_openresty
+  tags: cert
+
+- name: Enable CentOS openresty repo
+  ansible.builtin.yum_repository:
+    name: openresty
+    description: "Official OpenResty Open Source Repository for {{ ansible_distribution }}"
+    baseurl: "https://openresty.org/package/{{ ansible_distribution|lower }}/$releasever/$basearch"
+    skip_if_unavailable: False
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://openresty.org/package/pubkey.gpg
+    enabled: yes
+  tags: openresty
+
+- name: Add openresty yum key
+  ansible.builtin.rpm_key:
+    key: "https://openresty.org/package/pubkey.gpg"
+    state: present
+  register: import_key
+  tags: openresty
+
+#- name: Import openresty yum key (prevent verification prompt)
+#  command: "yum -q makecache -y --disablerepo='*' --enablerepo='openresty'"
+#  when: import_key.changed
+#  tags: openresty
+
+- name: Install openresty
+  ansible.builtin.dnf:
+    name:
+      - openresty
+    state: present
+  tags: openresty
+
+- name: Make dir for nginx logs
+  ansible.builtin.file:
+    path: /var/log/nginx
+    owner: nobody
+    state: directory
+  tags: openresty
+
+- name: Set httpd_can_network_relay flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: httpd_can_network_relay
+    state: yes
+    persistent: yes
+  tags: openresty
+
+- name: Configure nginx/openresty - main
+  ansible.builtin.template:
+    src: "templates/{{ item }}.conf.j2"
+    dest: "/usr/local/openresty/nginx/conf/{{ item }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    setype: usr_t
+  with_items:
+    - nginx
+    - wordpress
+    - kibana
+    - kafkaui
+  notify: reload_openresty
+  tags: nginx_conf
+
+- name: Enable nginx/openresty service
+  ansible.builtin.systemd:
+    name: openresty
+    state: started
+    enabled: yes
+  tags: openresty

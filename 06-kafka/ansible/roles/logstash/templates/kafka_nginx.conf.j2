@@ -1,0 +1,27 @@
+input {
+  kafka {
+    client_id => "{{ inventory_hostname }}-nginx"
+    group_id => "logstash-array"
+    topics => ["nginx"]
+    codec => "json"
+    bootstrap_servers => "{{ kafka_nodes | map('regex_replace', '^(.+)$', '\\1' ~ ':' ~ kafka_port_client) | join(',') }}"
+  }
+}
+
+filter {
+  date {
+    match => ["time_local", "UNIX"]
+  }
+  mutate {
+    remove_field => [ "time_local" ]
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => [{{ elastic_nodes | map('regex_replace', '^(.+)$', '"' ~ elastic_proto ~ '://' ~ '\\1' ~ ':' ~ elastic_port_client ~ '"') | join(', ') }}]
+    index => "logstash-nginx-%{+YYYY.MM.dd}"
+    user => "{{ logstash_internal_user.username }}"
+    password => "{{ logstash_internal_user.password }}"
+  }
+}

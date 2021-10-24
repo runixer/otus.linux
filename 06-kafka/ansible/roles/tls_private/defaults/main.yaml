@@ -1,0 +1,10 @@
+---
+
+pki_common_name: "{{ inventory_hostname }}"
+pki_subject_alt_name: "DNS:{{ inventory_hostname }},IP:{{ ansible_host }},IP:127.0.0.1"
+
+tls_group: tls-cert
+
+pki_key_file: "/etc/pki/otus/{{ inventory_hostname }}.pem"
+pki_csr_file: "/etc/pki/otus/{{ inventory_hostname }}.csr"
+pki_cert_file: "/etc/pki/otus/{{ inventory_hostname }}.crt"

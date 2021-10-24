@@ -1,0 +1,21 @@
+[Unit]
+Description=Kafka UI
+Documentation=https://github.com/provectus/kafka-ui
+Requires=network.target remote-fs.target
+After=network.target remote-fs.target kafka.service
+
+[Service]
+Type=simple
+User={{ kafkaui_user }}
+Group={{ kafkaui_group }}
+Environment=SERVER_PORT={{ kafkaui_port }}
+Environment=KAFKA_CLUSTERS_0_NAME=kafka
+Environment=KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=localhost:9092
+Environment=KAFKA_CLUSTERS_0_ZOOKEEPER=localhost:{{ zookeeper_port_client }}
+ExecStart=/bin/java -jar {{ kafkaui_file }}
+WorkingDirectory={{ kafkaui_data_dir }}
+TimeoutSec=30
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

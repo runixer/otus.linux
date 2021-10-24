@@ -1,0 +1,14 @@
+try {
+  print('Bootstrapping cluster primary instance...\n');
+  shell.connect('{{ innodb_cluster_user_name }}@{{ inventory_hostname }}', '{{ innodb_cluster_user_password }}');
+  var cluster = dba.createCluster('{{ innodb_cluster_name }}');
+{% for host in play_hosts %}
+{% if host != inventory_hostname %}
+  cluster.addInstance('{{ innodb_cluster_user_name }}@{{ host }}:3306', {recoveryMethod: 'clone'})  
+{% endif %}
+{% endfor %}
+  cluster.switchToMultiPrimaryMode()
+} catch(e){
+  print('\nThe InnoDB cluster could not be created.\n\nError: ' + e.message + '\n');
+  die();
+}

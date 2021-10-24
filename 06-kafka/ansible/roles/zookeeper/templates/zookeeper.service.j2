@@ -1,0 +1,19 @@
+[Unit]
+Description=Apache ZooKeeper Daemon
+Documentation=http://zookeeper.apache.org
+Requires=network.target
+After=network.target
+
+[Service]
+Type=simple
+User=zookeeper
+Group=zookeeper
+Environment=ZOO_LOG_DIR={{ zookeeper_log_dir }}
+ExecStart={{ zookeeper_dir }}/bin/zkServer.sh start-foreground "{{ zookeeper_config_dir }}/{{ zookeeper_config_file }}"
+ExecStop={{ zookeeper_dir }}/bin/zkServer.sh stop
+WorkingDirectory={{ zookeeper_data_dir }}
+TimeoutSec=30
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

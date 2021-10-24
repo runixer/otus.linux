@@ -1,0 +1,89 @@
+- name: Enable mysql repo
+  ansible.builtin.dnf:
+    name: https://dev.mysql.com/get/mysql80-community-release-el8-1.noarch.rpm
+    state: present
+
+- name: Disable Centos 8 mysql dnf module
+  command: dnf module disable mysql -y
+  args:
+    warn: false
+  register: result
+  changed_when: '"Nothing to do." not in result.stdout'
+
+- name: Install mysql router
+  ansible.builtin.dnf:
+    name:
+      - mysql-router
+      - python3-PyMySQL
+      - mysql
+    state: present
+  register: mysql_installed
+
+# Fix mysqlrouter systemd service - set PrivateTmp=false
+# Sockets default location is in /tmp, which become unusable with default PrivateTmp=false
+# - name: Fix mysqlrouter systemd service - set PrivateTmp=false
+#   community.general.ini_file:
+#     path: /usr/lib/systemd/system/mysqlrouter.service
+#     section: Service
+#     option: PrivateTmp
+#     value: false
+#   notify:
+#     - restart mysqlrouter
+#   tags:
+#     - mysql_router
+
+- name: Create/fix directory for socket
+  ansible.builtin.file:
+    path: "{{ mysqlrouter_socket | dirname }}"
+    state: directory
+    owner: mysqlrouter
+    group: mysqlrouter
+    mode: 0755
+    setype: mysqld_db_t
+
+- name: mysql router bootstrap
+  shell: >
+    mysqlrouter
+    --bootstrap '{{ mysqlrouter_bootstrap_server_url }}'
+    --disable-rest
+    --conf-skip-tcp
+    --conf-use-sockets
+    --conf-bind-address {{ mysqlrouter_bind_address }}
+    --connect-timeout {{ mysqlrouter_connect_timeout }}
+    --read-timeout {{ mysqlrouter_read_timeout }}
+    --conf-use-gr-notifications
+    --user mysqlrouter
+    --force
+  args:
+    creates: /etc/mysqlrouter/mysqlrouter.key
+  notify:
+    - restart mysqlrouter
+  tags:
+    - mysql_router
+
+- name: Remove unused sockets from mysqlrouter configuration file
+  community.general.ini_file:
+    path: /etc/mysqlrouter/mysqlrouter.conf
+    section: "{{ item }}"
+    state: absent
+  with_items:
+    - routing:innodbcluster_ro
+    - routing:innodbcluster_x_rw
+    - routing:innodbcluster_x_ro
+  notify:
+    - restart mysqlrouter
+  tags:
+    - mysql_router
+
+# Default location of mysqlrouter socket is /tmp, which is unreacheable, since
+#  PrivateTmp=true configured in /usr/lib/systemd/system/mysqlrouter.service
+- name: Fix location of mysqlrouter socket
+  community.general.ini_file:
+    path: /etc/mysqlrouter/mysqlrouter.conf
+    section: routing:innodbcluster_rw
+    option: socket
+    value: "{{ mysqlrouter_socket }}"
+  notify:
+    - restart mysqlrouter
+  tags:
+    - mysql_router

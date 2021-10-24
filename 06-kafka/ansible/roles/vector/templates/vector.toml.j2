@@ -1,0 +1,95 @@
+# =================================== CORE ====================================
+[api]
+enabled = true
+
+# =================================== NGINX ===================================
+[sources.journald-nginx]
+type = "journald"
+current_boot_only = true
+include_units = [ "nginx", "openresty" ]
+
+[transforms.transform-nginx-access]
+type = "filter"
+inputs = [ "journald-nginx" ]
+condition = '.SYSLOG_IDENTIFIER == "access"'
+
+[transforms.transform-nginx-access-json]
+type = "remap"
+inputs = ["transform-nginx-access"]
+source = '''
+  ., err = merge(., parse_json!(string!(.message)))
+  del(.message)
+'''
+
+[transforms.transform-nginx-error]
+type = "filter"
+inputs = [ "journald-nginx" ]
+condition = '.SYSLOG_IDENTIFIER != "access"'
+
+[transforms.transform-nginx-error-parse]
+type = "remap"
+inputs = [ "transform-nginx-error" ]
+source = '''
+  .time_local, err = to_float!(.__REALTIME_TIMESTAMP) / 1000000
+  .time_local = to_string(.time_local)
+'''
+
+[sinks.kafka-nginx]
+type = "kafka"
+inputs = [ "transform-nginx-access-json", "transform-nginx-error-parse" ]
+bootstrap_servers = "{{ kafka_nodes | map('regex_replace', '^(.+)$', '\\1' ~ ':' ~ kafka_port_client) | join(',') }}"
+compression = "none"
+topic = "nginx"
+encoding.codec = "json"
+encoding.except_fields = ["SYSLOG_IDENTIFIER", "SYSLOG_FACILITY", "PRIORITY", "timestamp", "source_type"]
+
+# =================================== PHP-FPM ===================================
+[sources.php-fpm-access]
+type = "file"
+include = [ "/var/log/php-fpm/access.log" ]
+read_from = "beginning"
+
+[transforms.transform-php-fpm-access-json]
+type = "remap"
+inputs = ["php-fpm-access"]
+source = '''
+  ., err = merge(., parse_json!(string!(.message)))
+  del(.message)
+'''
+
+[sources.php-fpm-error]
+type= "file"
+include = [ "/var/log/php-fpm/error.log"]
+read_from = "beginning"
+
+[transforms.transform-php-fpm-error]
+type = "remap"
+inputs = ["php-fpm-error"]
+source = '''
+  . |= parse_regex!(.message, r'^\[(?P<time>[^\]]+)\]\s(?P<level>[^:]+):\s(?P<message>.*)$')
+  .time_local = to_unix_timestamp(to_timestamp!(.time))
+  del(.time)
+'''
+
+[sources.php-fpm-www-error]
+type= "file"
+include = [ "/var/log/php-fpm/www-error.log"]
+read_from = "beginning"
+
+[transforms.transform-php-fpm-www-error]
+type = "remap"
+inputs = ["php-fpm-www-error"]
+source = '''
+  . |= parse_regex!(.message, r'^\[(?P<time>[^\]]+)\]\s(?P<message>.*)$')
+  .time_local = to_unix_timestamp(parse_timestamp!(.time+" +0000", format: "%v %T %Z %z"))
+  del(.time)
+'''
+
+[sinks.kafka-php-fpm]
+type = "kafka"
+inputs = [ "transform-php-fpm-access-json", "transform-php-fpm-error", "transform-php-fpm-www-error" ]
+bootstrap_servers = "{{ kafka_nodes | map('regex_replace', '^(.+)$', '\\1' ~ ':' ~ kafka_port_client) | join(',') }}"
+compression = "none"
+topic = "wordpress"
+encoding.codec = "json"
+encoding.except_fields = ["timestamp", "source_type"]

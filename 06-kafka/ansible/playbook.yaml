@@ -1,0 +1,87 @@
+#Upgrade bastion first
+- hosts: bastion
+  become: yes
+  roles:
+    - { role: tune_all, tags: [tune_all] }
+    - { role: upgrade, tags: [upgrade] }
+
+- hosts: all:!bastion
+  become: yes
+  roles:
+    - { role: tune_all, tags: [tune_all] }
+    - { role: upgrade, tags: [upgrade] }
+
+- hosts: log
+  become: yes
+  vars:
+    zookeeper_nodes: "{{ groups['log'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
+    kafka_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+    elastic_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+    elastic_user: { username: "elastic", password: "changeMe" }
+    elastic_port_api: 9200
+    kibana_system_user: { username: "kibana_system", password: "changeMe" }
+    logstash_system_user: { username: "logstash_system", password: "changeMe" }
+    logstash_internal_user: { username: "logstash_internal", password: "changeMe" }
+    logstash_admin_user: { username: "logstash_admin", password: "changeMe" }
+  roles:
+    - { role: oraclejdk, tags: [oraclejdk]}
+    - { role: tls_private, tags: [tls_private]}
+    - { role: elasticsearch, tags: [elasticsearch]}
+    - { role: kibana, tags: [kibana]}
+    - { role: zookeeper, tags: [zookeeper] }
+    - { role: kafka, tags: [kafka] }
+    - { role: logstash, tags: [logstash] }
+
+- hosts: log[0]
+  become: yes
+  roles:
+    - { role: kafkaui, tags: [kafkaui]}
+
+- hosts: db
+  become: yes
+  roles:
+    - innodb_cluster
+  tags:
+    - db
+
+- hosts: app
+  become: yes
+  vars:
+    wp_files_owner: apache
+    wp_files_group: apache
+    mysqlrouter_bootstrap_server_url: "{{ innodb_cluster_user_name }}:{{ innodb_cluster_user_password }}@{{ groups['db'][0] }}"
+    wp_db_host: "localhost:{{ mysqlrouter_socket }}"
+    wp_log_location: /var/log/wordpress.log
+    # For vector
+    kafka_nodes: "{{ groups['log'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
+  roles:
+    - { role: vector, tags: [vector] }
+    - { role: php_fpm, tags: [php_fpm] }
+    - { role: wordpress, tags: [wordpress] }
+    - { role: mysql_router, tags: [mysql_router] }
+
+# Create wordpress database
+- hosts: app[0]
+  become: yes
+  vars:
+    mysql_socket: "{{ mysqlrouter_socket }}"
+    mysql_username: "{{ innodb_cluster_user_name }}"
+    mysql_password: "{{ innodb_cluster_user_password }}"
+  roles:
+    - wordpress_mysqldb
+
+- hosts: nginx
+  become: yes
+  vars:
+    wp_files_owner: nobody
+    wp_files_group: nobody
+    # For vector
+    kafka_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+    # Upstreams
+    upstreams: "{{ groups['app'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+    kibana_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
+    kafkaui_nodes: ["{{ hostvars[groups['log'][0]]['inventory_hostname'] }}"]
+  roles:
+    - { role: vector, tags: [vector] }
+    - { role: nginx, tags: [nginx] }
+    - { role: wordpress, tags: [wordpress] }

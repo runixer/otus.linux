@@ -1,0 +1,77 @@
+# PHP-FPM upstreams
+upstream backend_wp {
+{% for host in upstreams %}
+  server {{ host }}:9000;
+{% endfor %}
+}
+
+# TODO: Active health check
+
+server {
+  listen 80 default;
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+
+  location /health {
+    return 200;
+    access_log off;
+  }
+
+}
+
+server {
+  listen 443 ssl http2;
+
+  server_name otus.internal {{ ansible_hostname }} {{ external_ip }} {{ ansible_host }};
+
+  ssl_certificate /etc/pki/otus/{{ ansible_hostname }}.crt;
+  ssl_certificate_key /etc/pki/otus/{{ ansible_hostname }}.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  root /var/www/wordpress;
+  index index.php;
+
+  location = /health {
+    return 200;
+    access_log off;
+  }
+
+  location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+  }
+
+  location = /robots.txt {
+    allow all;
+    log_not_found off;
+    access_log off;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.php?$args;
+  }
+
+  location ~ \.php$ {
+    include fastcgi_params;
+
+    # Set timeout to 2 seconds
+    fastcgi_connect_timeout 2s;
+
+    fastcgi_intercept_errors on;
+    fastcgi_pass backend_wp;
+
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    fastcgi_param PATH_INFO $fastcgi_path_info;
+    fastcgi_param HTTP_X_REQUEST_ID $request_id;
+    fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+  }
+
+  location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+    expires max;
+    log_not_found off;
+  }
+
+}

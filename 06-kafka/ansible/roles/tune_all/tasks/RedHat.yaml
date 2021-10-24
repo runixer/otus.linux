@@ -1,0 +1,72 @@
+- name: Install CA pem file (Red Hat)
+  ansible.builtin.copy:
+    content: "{{ ca }}"
+    dest: "/etc/pki/ca-trust/source/anchors/ca-otus.pem"
+  notify: ca_redhat
+  tags: cert
+
+- name: Disable rpcbind service
+  ansible.builtin.systemd:
+    name: "{{ service_name }}"
+    state: stopped
+    enabled: no
+  with_items:
+    - rpcbind.service
+    - rpcbind.socket
+  loop_control:
+    loop_var: service_name
+
+- name: Disable chronyd listen
+  ansible.builtin.lineinfile:
+    path: /etc/chrony.conf
+    regexp: '^cmdport'
+    line: cmdport 0
+    state: present
+  notify: restart chronyd
+
+- name: Disable sshd ipv6
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: 'AddressFamily'
+    line: AddressFamily inet
+    state: present
+  notify: restart sshd
+
+- name: Disable ipv6
+  ansible.builtin.copy:
+    content: |
+      net.ipv6.conf.all.disable_ipv6 = 1
+      net.ipv6.conf.default.disable_ipv6 = 1
+    dest: /etc/sysctl.d/70-ipv6.conf
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  notify:
+    - load 70-ipv6.conf
+
+- name: Remove unused packages
+  ansible.builtin.dnf:
+    autoremove: yes
+    state: absent
+    name:
+      - rsyslog
+
+- name: Remove unused files
+  ansible.builtin.file:
+    state: absent
+    path: "{{ file_name }}"
+  with_items:
+    - /etc/rsyslog.d/
+    - /var/log/cloud-init.log
+    - /var/log/cloud-init-output.log
+  loop_control:
+    loop_var: file_name
+
+- name: Install tools (required for rc-local)
+  ansible.builtin.dnf:
+    autoremove: yes
+    state: present
+    name:
+      - iproute-tc
+      - net-tools

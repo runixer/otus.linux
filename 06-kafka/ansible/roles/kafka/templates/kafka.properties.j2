@@ -1,0 +1,13 @@
+broker.id={{ play_hosts.index(inventory_hostname) }}
+listeners=PLAINTEXT://0.0.0.0:9092
+advertised.listeners=PLAINTEXT://{{ inventory_hostname }}:9092
+zookeeper.connect={{ zookeeper_nodes | map('regex_replace', '^(.+)$', '\\1' ~ ':' ~ zookeeper_port_client) | join(',') }}
+
+auto.create.topics.enable=false
+
+############################# Internal Topic Settings  #############################
+# The replication factor for the group metadata internal topics "__consumer_offsets" and "__transaction_state"
+# For anything other than development testing, a value greater than 1 is recommended to ensure availability such as 3.
+offsets.topic.replication.factor={{ kafka_rfactor }}
+transaction.state.log.replication.factor={{ kafka_rfactor }}
+transaction.state.log.min.isr={{ kafka_rfactor }}

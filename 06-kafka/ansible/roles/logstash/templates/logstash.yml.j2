@@ -1,0 +1,12 @@
+path.data: /var/lib/logstash
+path.logs: /var/log/logstash
+
+pipeline.ecs_compatibility: disabled
+
+# https://www.elastic.co/guide/en/logstash/current/ls-security.html#ls-monitoring-user
+xpack.monitoring.elasticsearch.username: "{{ logstash_system_user.username }}"
+xpack.monitoring.elasticsearch.password: "{{ logstash_system_user.password }}"
+
+# https://www.elastic.co/guide/en/logstash/current/ls-security.html#ls-pipeline-management-user
+xpack.management.elasticsearch.username: "{{ logstash_admin_user.username }}" 
+xpack.management.elasticsearch.password: "{{ logstash_admin_user.password }}"

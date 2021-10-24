@@ -1,0 +1,98 @@
+- name: Enable mysql repo
+  ansible.builtin.dnf:
+    name: https://dev.mysql.com/get/mysql80-community-release-el8-1.noarch.rpm
+    state: present
+
+- name: Disable Centos 8 mysql dnf module
+  command: dnf module disable mysql -y
+  args:
+    warn: false
+  register: result
+  changed_when: '"Nothing to do." not in result.stdout'
+
+# - name: Remove mysql
+#   ansible.builtin.dnf:
+#     name:
+#       - mysql-community-server
+#     state: absent
+
+# - name: Remove mysql files
+#   ansible.builtin.file:
+#     path: "{{ item }}"
+#     state: absent
+#   with_items:
+#     - /var/lib/mysql/
+#     - /var/log/mysqld.log
+
+- name: Install mysql
+  ansible.builtin.dnf:
+    name:
+      - mysql-community-server
+      - mysql-shell
+      - python3-PyMySQL
+    state: present
+  register: mysql_installed
+
+- name: Make /etc/my.cnf from template
+  ansible.builtin.template:
+    dest: /etc/my.cnf
+    src: templates/my.cnf
+    owner: root
+    group: root
+    mode: '0644'
+    setype: mysqld_etc_t
+
+# https://dba.stackexchange.com/questions/273847/mysql-innodb-cluster
+- name: Set mysql_connect_any flag on and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: mysql_connect_any
+    state: yes
+    persistent: yes
+  tags: openresty
+
+- name: Enable mysql service
+  ansible.builtin.systemd:
+    name: mysqld
+    state: started
+    enabled: yes
+  register: mysql_start
+
+- name: Get temporary passwd
+  command: grep -oP 'temporary password.*:\s\K.*' /var/log/mysqld.log
+  changed_when: false
+  when: mysql_installed.changed
+  register: temp_passwd
+
+# TODO: Replace with some more secure method (write all passwords to a file instead of shell)
+- name: Set mysql root passwd
+  shell: >
+    mysql
+    --connect-expired-password
+    --user=root
+    --password=`grep -oP 'temporary password.*:\\s\\K.*' /var/log/mysqld.log`
+    -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}';"
+  when: mysql_installed.changed
+
+# TODO: Discover, why this task changed everytime
+- name: Create InnoDB Cluster admin user
+  community.mysql.mysql_user:
+    name: "{{ innodb_cluster_user_name }}"
+    password: "{{ innodb_cluster_user_password }}"
+    host: "%.internal"
+    priv: "*.*:ALL,GRANT"
+    state: present
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+
+- name: Test if clustering already exists
+  ansible.builtin.stat:
+    path: "{{ mysql_data_path }}/mysql_innodb_cluster_metadata"
+  register: cluster_data_path
+  when:
+    - inventory_hostname == play_hosts[0]
+
+- name: Bootstrap the cluster if new deployment
+  import_tasks: bootstrap_cluster.yaml
+  when:
+    - inventory_hostname == play_hosts[0]
+    - (not cluster_data_path.stat.exists)

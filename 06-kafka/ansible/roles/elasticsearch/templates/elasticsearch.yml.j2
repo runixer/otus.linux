@@ -1,0 +1,19 @@
+cluster.name: {{ elastic_clustername }}
+node.name: {{ inventory_hostname }}
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 0.0.0.0
+
+discovery.seed_hosts: [{{ elastic_nodes | map('regex_replace', '^(.+)$', '"' ~ '\\1' ~ '"') | join(', ') }}]
+cluster.initial_master_nodes: [{{ elastic_nodes | map('regex_replace', '^(.+)$', '"' ~ '\\1' ~ '"') | join(', ') }}]
+
+ingest.geoip.downloader.enabled: false
+
+xpack.license.self_generated.type: basic
+xpack.security.enabled: true
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: full
+xpack.security.transport.ssl.client_authentication: required
+xpack.security.transport.ssl.key: {{ elastic_pki_key_file }}
+xpack.security.transport.ssl.certificate: {{ elastic_pki_cert_file }}
+xpack.security.transport.ssl.certificate_authorities: {{ elastic_pki_ca_file }}

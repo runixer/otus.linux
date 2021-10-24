@@ -1,0 +1,27 @@
+# Based on https://www.nginx.com/blog/nginx-elasticsearch-better-together/
+
+# Kibana upstreams
+upstream backend_kibana {
+{% for host in kibana_nodes %}
+  server {{ host }}:{{ kibana_port_client }};
+{% endfor %}
+}
+
+# TODO: Active health check
+
+server {
+  listen 443 ssl http2;
+
+  server_name kibana.otus.internal;
+
+  ssl_certificate /etc/pki/otus/kibana.crt;
+  ssl_certificate_key /etc/pki/otus/kibana.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  location / {
+    proxy_pass http://backend_kibana;
+    proxy_redirect off;
+    proxy_buffering off;
+    proxy_connect_timeout 2;
+  }
+}

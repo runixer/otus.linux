@@ -1,0 +1,40 @@
+---
+
+- name: Make dir for cert
+  ansible.builtin.file:
+    path: /etc/pki/otus
+    state: directory
+  tags: cert
+
+- name: Make group for private key access
+  ansible.builtin.group:
+    name: "{{ tls_group }}"
+    state: present
+
+- name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+  community.crypto.openssl_privatekey:
+    path: "{{ pki_key_file }}"
+    owner: root
+    group: "{{ tls_group }}"
+    mode: 0640
+
+- name: Generate an OpenSSL Certificate Signing Request with subjectAltName extension
+  community.crypto.openssl_csr:
+    path: "{{ pki_csr_file }}"
+    privatekey_path: "{{ pki_key_file }}"
+    common_name: "{{ pki_common_name }}"
+    subject_alt_name: "{{ pki_subject_alt_name }}"
+    owner: root
+    group: "{{ tls_group }}"
+    mode: 0640
+
+- name: Generate an OpenSSL certificate signed with your own CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ pki_cert_file }}"
+    csr_path: "{{ pki_csr_file }}"
+    provider: ownca
+    ownca_content: "{{ ca }}"
+    ownca_privatekey_content: "{{ cakey }}"
+    owner: root
+    group: "{{ tls_group }}"
+    mode: 0640
