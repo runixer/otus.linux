@@ -55,7 +55,7 @@
     # For vector
     kafka_nodes: "{{ groups['log'] | map('extract', hostvars, ['ansible_host']) | flatten }}"
   roles:
-    - { role: vector, tags: [vector] }
+    - { role: vector, tags: [vector], when: "(groups['log'] | length) > 0" }
     - { role: php_fpm, tags: [php_fpm] }
     - { role: wordpress, tags: [wordpress] }
     - { role: mysql_router, tags: [mysql_router] }
@@ -82,6 +82,6 @@
     kibana_nodes: "{{ groups['log'] | map('extract', hostvars, ['inventory_hostname']) | flatten }}"
     kafkaui_nodes: ["{{ hostvars[groups['log'][0]]['inventory_hostname'] }}"]
   roles:
-    - { role: vector, tags: [vector] }
+    - { role: vector, tags: [vector], when: "(groups['log'] | length) > 0" }
     - { role: nginx, tags: [nginx] }
     - { role: wordpress, tags: [wordpress] }
