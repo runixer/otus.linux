@@ -277,9 +277,11 @@ Apply complete! Resources: 2 added, 0 changed, 1 destroyed.
 ```
 
 Убедимся в Kafka UI что нода появилась:
+
 [<img src="images/08_kafkaui.png" width="600">](images/08_kafkaui.png)
 
 Убедимся что журналы продолжают отображаться в Kibana:
+
 [<img src="images/09_kibana.png" width="600">](images/09_kibana.png)
 
 ## 4. Общее описание модуля terraform
