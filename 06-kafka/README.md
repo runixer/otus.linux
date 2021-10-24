@@ -54,7 +54,7 @@ Ansible-роль nginx была модифицирована:
 1. Сконфигурирован вывод access и error журналов в journald через syslog в формате json.
 2. Добавлены TLS-сертификаты и конфигурации для Kibana и Kafka UI.
 
-Так же в ansible-роли php-fpm был сконфигурован вывод access-журналов в формате json. К сожалению, php-fpm до сих пор не поддерживает отправку журналов в syslog либо в journald. В связи с этим добавил конфигурирование logrotate для файлов журналов php-fpm.
+Так же в ansible-роли php-fpm был сконфигурирован вывод access-журналов в формате json. К сожалению, php-fpm до сих пор не поддерживает отправку журналов в syslog либо в journald. В связи с этим добавил конфигурирование logrotate для файлов журналов php-fpm.
 
 Ansible-роль vector собирает access и error журналы nginx из journald, access и error журналы php-fpm из файлов. Далее vector отправляет журналы в kafka.
 
