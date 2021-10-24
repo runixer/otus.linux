@@ -65,7 +65,6 @@
 
 - name: Install tools (required for rc-local)
   ansible.builtin.dnf:
-    autoremove: yes
     state: present
     name:
       - iproute-tc
