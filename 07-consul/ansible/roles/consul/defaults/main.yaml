@@ -1,0 +1,5 @@
+consul_version: 1.10.3
+consul_server: false
+consul_services: []
+kafkaui_port: 8081
+kibana_port_client: 5601

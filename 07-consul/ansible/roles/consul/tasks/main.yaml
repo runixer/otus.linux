@@ -1,0 +1,77 @@
+- name: Enable HashiCorp repo GPG key
+  ansible.builtin.rpm_key:
+    key: https://rpm.releases.hashicorp.com/gpg
+    state: present
+
+- name: Enable HashiCorp repo
+  ansible.builtin.yum_repository:
+    name: hashicorp
+    description: "Hashicorp Stable"
+    baseurl: "https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable"
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://rpm.releases.hashicorp.com/gpg
+    skip_if_unavailable: True
+    repo_gpgcheck: yes
+    sslverify: yes
+    sslcacert: /etc/pki/tls/certs/ca-bundle.crt
+    metadata_expire: "300"
+
+- name: Install Consul-{{ consul_version }} and python3-dnf-plugin-versionlock
+  ansible.builtin.dnf:
+    name:
+      - "consul-{{ consul_version }}"
+      - python3-dnf-plugin-versionlock
+    state: present
+
+- name: Lock Consul version
+  command:
+    cmd: dnf versionlock consul
+    warn: false
+  register: result
+  changed_when: "'Package already locked in equivalent form:' not in result.stdout"
+
+- name: Create Consul config file from template
+  ansible.builtin.template:
+    src: consul.hcl.j2
+    dest: /etc/consul.d/consul.hcl
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  notify:
+    - restart consul
+  tags: consul_conf
+
+- name: Install required packages for wordpress healthcheck script
+  ansible.builtin.dnf:
+    name:
+      - fcgi
+      - html2text
+    state: present
+  when: "'wordpress' in consul_services"
+  tags: consul_conf
+
+- name: Copy wordpress healthcheck script
+  ansible.builtin.copy:
+    src: check-wordpress.sh
+    dest: /usr/local/bin/check-wordpress.sh
+    owner: root
+    group: root
+    mode: '0755'
+  when: "'wordpress' in consul_services"
+  tags: consul_conf
+
+- name: Create Consul service config files
+  ansible.builtin.copy:
+    src: "{{ item }}.hcl"
+    dest: "/etc/consul.d/{{ item }}.hcl"
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  with_items: "{{ consul_services }}"
+  when: consul_services|length > 0
+  notify:
+    - restart consul
+  tags: consul_conf

@@ -1,0 +1,170 @@
+- name: Enable Elastic repository GPG key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Enable Elastic repository
+  ansible.builtin.yum_repository:
+    name: elastic
+    description: Elastic repository for 7.x packages
+    baseurl: https://artifacts.elastic.co/packages/7.x/yum
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: yes
+
+- name: Install Elasticsearch
+  ansible.builtin.dnf:
+    name:
+      - elasticsearch
+
+- name: Generate tls keys for a Elasticsearch
+  include_role:
+    name: tls_private
+  vars:
+    tls_group: elasticsearch
+    pki_ca_file: "{{ elastic_pki_ca_file }}"
+    pki_key_file: "{{ elastic_pki_key_file }}"
+    pki_csr_file: "{{ elastic_pki_csr_file }}"
+    pki_cert_file: "{{ elastic_pki_cert_file }}"
+
+- name: Write ca key to a Elasticsearch dir
+  ansible.builtin.copy:
+    content: "{{ ca }}"
+    dest: "{{ elastic_pki_ca_file }}"
+
+- name: Create elasticsearch config file from templates
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  notify:
+    - restart elasticsearch
+
+- name: Check if bootstrap password is set
+  command: /usr/share/elasticsearch/bin/elasticsearch-keystore list
+  register: list_keystore
+  changed_when: False
+
+- name: Create Bootstrap password for elastic user
+  shell: set -o pipefail && echo {{ elastic_user.password | quote }} | /usr/share/elasticsearch/bin/elasticsearch-keystore add -x 'bootstrap.password'
+  when:
+    - list_keystore is defined and 'bootstrap.password' not in list_keystore.stdout_lines
+  no_log: true
+
+- name: Enable elasticsearch systemd service
+  ansible.builtin.systemd:
+    name: elasticsearch.service
+    state: started
+    daemon_reload: yes
+    enabled: yes
+
+- name: Wait until elasticsearch started
+  ansible.builtin.uri:
+    url: "http://localhost:{{ es_port_api }}"
+    method: GET
+    status_code: [200, 401]
+    return_content: yes
+  register: result
+  until: result.content
+  retries: 60
+  delay: 1
+
+# https://www.elastic.co/guide/en/logstash/current/ls-security.html#ls-http-auth-basic
+- name: Create logstash_writer role
+  ansible.builtin.uri:
+    url: http://localhost:{{ es_port_api }}/_xpack/security/role/logstash_writer
+    method: POST
+    body_format: json
+    body: |
+      {
+        "cluster": ["manage_index_templates", "monitor", "manage_ilm"],
+        "indices": [
+          {
+            "names": [ "logstash-*" ],
+            "privileges": ["write","create","create_index","manage","manage_ilm"]
+          }
+        ]
+      }
+    status_code: 200
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+  when: inventory_hostname == play_hosts[0]
+  no_log: True
+  tags: es_p
+
+- name: Create {{ logstash_internal_user.username }} user
+  ansible.builtin.uri:
+    url: http://localhost:{{ es_port_api }}/_xpack/security/user/{{ logstash_internal_user.username }}
+    method: POST
+    body_format: json
+    body: |
+      {
+        "password" : "{{ logstash_internal_user.password }}",
+        "roles" : [ "logstash_writer"],
+        "full_name" : "Internal Logstash User"
+      }
+    status_code: 200
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+  when: inventory_hostname == play_hosts[0]
+  no_log: True
+  tags: es_p
+
+- name: Create {{ logstash_admin_user.username }} user
+  ansible.builtin.uri:
+    url: http://localhost:{{ es_port_api }}/_xpack/security/user/{{ logstash_admin_user.username }}
+    method: POST
+    body_format: json
+    body: |
+      {
+        "password" : "{{ logstash_admin_user.password }}",
+        "roles" : [ "logstash_writer", "logstash_admin"],
+        "full_name" : "Internal Logstash Admin"
+      }
+    status_code: 200
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+  when: inventory_hostname == play_hosts[0]
+  no_log: True
+  tags: es_p
+
+- name: Update Reserved User Passwords
+  ansible.builtin.uri:
+    url: http://localhost:{{ es_port_api }}/_xpack/security/user/{{ item.username }}/_password
+    method: POST
+    body_format: json
+    body: "{ \"password\":\"{{ item.password }}\" }"
+    status_code: 200
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+  loop:
+    - "{{ kibana_system_user }}"
+    - "{{ logstash_system_user }}"
+    - "{{ logstash_admin_user }}"
+  when: inventory_hostname == play_hosts[0]
+  no_log: True
+  tags: es_p
+
+- name: Enable Reserved Users
+  ansible.builtin.uri:
+    url: http://localhost:{{ es_port_api }}/_xpack/security/user/{{ item.username }}/_enable
+    method: PUT
+    status_code: 200
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+  loop:
+    - "{{ kibana_system_user }}"
+    - "{{ logstash_system_user }}"
+  when: inventory_hostname == play_hosts[0]
+  no_log: True
+  tags: es_p

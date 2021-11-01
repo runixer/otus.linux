@@ -1,0 +1,20 @@
+zookeeper_port_client: 2181
+
+kafka_version: 3.0.0
+kafka_scala_version: 2.13
+kafka_mirror: https://apache-mirror.rbc.ru/pub/apache/kafka/
+kafka_package: kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz
+
+kafka_group: kafka
+kafka_user: kafka
+
+kafka_root_dir: /opt
+kafka_log_dir: /var/log/kafka
+kafka_install_dir: '{{ kafka_root_dir }}/apache-kafka-{{ kafka_scala_version }}-{{ kafka_version }}'
+kafka_dir: '{{ kafka_root_dir }}/kafka'
+kafka_data_dir: /var/lib/kafka
+kafka_config_dir: /etc/kafka
+kafka_config_file: kafka.properties
+
+# Replication factor
+kafka_rfactor: "{% if play_hosts|length>1 %}2{% else %}1{% endif %}"

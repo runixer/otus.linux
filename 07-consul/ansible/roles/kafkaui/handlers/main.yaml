@@ -1,0 +1,6 @@
+- name: restart kafkaui
+  ansible.builtin.systemd:
+    name: kafkaui.service
+    state: restarted
+    daemon_reload: yes
+    enabled: yes

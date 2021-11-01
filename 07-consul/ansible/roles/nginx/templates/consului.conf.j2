@@ -1,0 +1,23 @@
+server {
+  listen 443 ssl http2;
+
+  server_name consul.otus.internal;
+
+  ssl_certificate /etc/pki/otus/consului.crt;
+  ssl_certificate_key /etc/pki/otus/consului.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  # Resolve backend servers in consul
+  resolver 127.0.0.1:8600 valid=3;
+  set $backend_consului http://consul.service.dc1.lan:8500;
+
+  location / {
+    proxy_pass $backend_consului;
+    proxy_set_header Host            $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_redirect off;
+    proxy_buffering off;
+    expires off;
+    proxy_connect_timeout 2;
+  }
+}

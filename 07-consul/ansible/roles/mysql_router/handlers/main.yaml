@@ -1,0 +1,7 @@
+---
+- name: restart mysqlrouter
+  ansible.builtin.systemd:
+    name: mysqlrouter
+    daemon_reload: yes
+    enabled: yes
+    state: restarted

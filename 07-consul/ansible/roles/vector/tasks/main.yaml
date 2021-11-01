@@ -1,0 +1,50 @@
+- name: Enable Timber (vector) repo GPG key
+  ansible.builtin.rpm_key:
+    key: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
+    state: present
+
+- name: Enable Timber (vector) repo
+  ansible.builtin.yum_repository:
+    description: "Take Control Of Your Observability Data with Vector, hosted by Cloudsmith."
+    skip_if_unavailable: True
+    name: timber-vector
+    baseurl: "https://repositories.timber.io/public/vector/rpm/el/8/$basearch"
+    repo_gpgcheck: yes
+    enabled: yes
+    gpgkey: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
+    gpgcheck: yes
+    sslverify: yes
+    sslcacert: /etc/pki/tls/certs/ca-bundle.crt
+    metadata_expire: "300"
+
+- name: Install vector
+  ansible.builtin.dnf:
+    name:
+      - vector
+
+- name: Add vector user to "adm" group for log file access (php-fpm)
+  ansible.builtin.user:
+    name: vector
+    groups: adm
+    append: yes
+  notify:
+    - restart vector
+
+- name: Create vector config file from template
+  ansible.builtin.template:
+    src: vector.toml.j2
+    dest: "{{ vector_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  notify:
+    - restart vector
+  tags: vector_conf
+
+- name: Enable vector systemd service
+  ansible.builtin.systemd:
+    name: vector.service
+    state: started
+    daemon_reload: yes
+    enabled: yes

@@ -1,0 +1,19 @@
+#cloud-config
+users:
+  - name: ${username}
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh-authorized-keys:
+      ${ssh-key}
+timezone: "Europe/Moscow"
+ntp:
+  enabled: true
+  ntp_client: chrony
+  # https://cloud.yandex.ru/docs/compute/solutions/ntp
+  servers:
+    - "ntp0.NL.net"
+    - "clock.isc.org"
+    - "ntp2.vniiftri.ru"
+    - "ntps1-0.eecsit.tu-berlin.de"
+    - "ntp.ix.ru"

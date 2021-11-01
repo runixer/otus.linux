@@ -1,0 +1,30 @@
+- name: Update CA Trust (Red Hat)
+  command: update-ca-trust
+  listen: ca_redhat
+  tags: cert
+
+- name: Update CA Trust (Debian, Ubuntu)
+  command: update-ca-certificates
+  listen: ca_debian
+  tags: cert
+
+- name: restart chronyd
+  ansible.builtin.systemd:
+    name: chronyd
+    state: restarted
+    enabled: yes
+
+- name: restart sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+    enabled: yes
+
+- name: load 70-ipv6.conf
+  command: sysctl --load /etc/sysctl.d/70-ipv6.conf
+
+- name: restart rc-local
+  ansible.builtin.systemd:
+    name: rc-local
+    state: restarted
+    enabled: yes

@@ -1,0 +1,44 @@
+- name: Enable Elastic repository GPG key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Enable Elastic repository
+  ansible.builtin.yum_repository:
+    name: elastic
+    description: Elastic repository for 7.x packages
+    baseurl: https://artifacts.elastic.co/packages/7.x/yum
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: yes
+
+- name: Install logstash
+  ansible.builtin.dnf:
+    name:
+      - logstash
+
+- name: Create logstash config file from templates
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/logstash/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  with_items:
+    - { src: 'kafka_nginx.conf.j2', dest: 'conf.d/kafka_nginx.conf' }
+    - { src: 'kafka_php-fpm.conf.j2', dest: 'conf.d/kafka_php-fpm.conf' }
+    - { src: 'pipelines.yml.j2', dest: 'pipelines.yml' }
+    - { src: 'logstash.yml.j2', dest: 'logstash.yml' }
+  notify:
+    - restart logstash
+  tags: logstash_conf
+
+- name: Enable logstash systemd service
+  ansible.builtin.systemd:
+    name: logstash.service
+    state: started
+    daemon_reload: yes
+    enabled: yes

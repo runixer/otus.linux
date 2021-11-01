@@ -1,0 +1,2 @@
+kafka_port_client: 9092
+vector_config_file: /etc/vector/vector.toml

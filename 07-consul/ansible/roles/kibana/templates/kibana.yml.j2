@@ -1,0 +1,15 @@
+server.host: "0.0.0.0"
+server.name: "{{ inventory_hostname }}"
+elasticsearch.hosts: [{{ elastic_nodes | map('regex_replace', '^(.+)$', '"' ~ elastic_proto ~ '://' ~ '\\1' ~ ':' ~ elastic_port_client ~ '"') | join(', ') }}]
+
+xpack.encryptedSavedObjects.encryptionKey: 1201feabe17db3639939c77f271a7048
+xpack.reporting.encryptionKey: 052cb845b485922f54f55c60c3111c0c
+xpack.security.encryptionKey: ed04ad7fc020e72f8ef019cbca8b3872
+
+# https://www.elastic.co/guide/en/kibana/current/using-kibana-with-security.html
+elasticsearch.username: "{{ kibana_system_user.username }}"
+elasticsearch.password: "{{ kibana_system_user.password }}"
+
+# https://www.elastic.co/guide/en/kibana/7.15/settings.html#server-publicBaseUrl
+# TODO: Replace with variable (nginx and terraform too)
+server.publicBaseUrl: "https://kibana.otus.internal"

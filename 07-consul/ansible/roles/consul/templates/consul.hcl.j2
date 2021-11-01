@@ -1,0 +1,12 @@
+#jinja2: trim_blocks:False
+node_name = "{{ ansible_hostname }}"
+domain = "lan"
+datacenter = "dc1"
+data_dir = "/opt/consul"
+ui = {% if consul_server %}true{% else %}false{% endif %}
+server = {% if consul_server %}true{% else %}false{% endif %}
+bootstrap = {% if ((consul_server) and (inventory_hostname == consul_nodes[0])) %}true{% else %}false{% endif %}
+bind_addr = "0.0.0.0"
+client_addr = "0.0.0.0"
+enable_local_script_checks = true
+retry_join = [{{ consul_nodes | map('regex_replace', '^(.+)$', '\"' ~ '\\1' ~ '\"') | join(',') }}]

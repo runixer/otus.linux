@@ -1,0 +1,59 @@
+user nobody;
+worker_processes auto;
+error_log syslog:server=unix:/dev/log,nohostname,tag=error info;
+
+events {
+  worker_connections 1024;
+}
+
+http {
+  include       mime.types;
+  default_type  application/octet-stream;
+
+  # Log in json format
+  # https://docs.nginx.com/nginx/admin-guide/monitoring/logging/
+  log_format json_combined escape=json
+  '{'
+    '"time_local":"$msec",'
+
+    '"client_ip":"$remote_addr",'
+
+    '"request_scheme":"$scheme",'
+    '"request_method": "$request_method", '
+    '"request_uri":"$request_uri",'
+    '"server_protocol":"$server_protocol",'
+
+    '"status": "$status",'
+    '"body_bytes_sent":"$body_bytes_sent",'
+
+    '"http_host":"$host",'
+    '"http_referrer":"$http_referer",'
+    '"http_user_agent":"$http_user_agent",'
+
+    '"request_id":"$request_id",'
+    '"upstream_addr":"$upstream_addr",'
+
+    # SSL
+    '"ssl_protocol":"$ssl_protocol",'
+    '"ssl_cipher":"$ssl_cipher",'
+
+    # Timings
+    '"upstream_connect_time":"$upstream_connect_time",'
+    '"upstream_header_time":"$upstream_header_time",'
+    '"upstream_response_time":"$upstream_response_time",'
+    '"request_time":"$request_time"'
+  '}';
+
+  # Log to journald
+  access_log syslog:server=unix:/dev/log,nohostname,tag=access json_combined;
+
+  sendfile on;
+  #tcp_nopush on;
+  #tcp_nodelay on;
+  keepalive_timeout 65;
+
+  include wordpress.conf;
+  {% if kibana_nodes|length >0 %}include kibana.conf;{% endif %}
+  {% if kafkaui_nodes|length >0 %}include kafkaui.conf;{% endif %}
+  {% if consului_nodes|length >0 %}include consului.conf;{% endif %}
+}

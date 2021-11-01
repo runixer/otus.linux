@@ -1,0 +1,76 @@
+- name: Enable Elastic repository GPG key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Enable Elastic repository
+  ansible.builtin.yum_repository:
+    name: elastic
+    description: Elastic repository for 7.x packages
+    baseurl: https://artifacts.elastic.co/packages/7.x/yum
+    skip_if_unavailable: True
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: yes
+
+- name: Install Kibana
+  ansible.builtin.dnf:
+    name:
+      - kibana
+
+- name: Create kibana config file from templates
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: root
+    mode: '0644'
+    setype: etc_t
+  notify:
+    - restart kibana
+
+- name: Enable kibana systemd service
+  ansible.builtin.systemd:
+    name: kibana.service
+    state: started
+    daemon_reload: yes
+    enabled: yes
+
+- name: Wait until kibana started
+  ansible.builtin.uri:
+    url: "http://localhost:{{ kibana_port_client }}/api/"
+    method: GET
+    status_code: [200, 401]
+    return_content: yes
+  register: result
+  until: result.status in [200, 401]
+  retries: 120
+  delay: 1
+
+- name: Create Logstash index patterns
+  ansible.builtin.uri:
+    url: http://localhost:{{ kibana_port_client }}/api/index_patterns/index_pattern
+    method: POST
+    body_format: json
+    body: |
+      {
+        "override": true,
+        "refresh_fields": true,
+        "index_pattern": {
+          "title": "logstash-{{ item }}-*",
+          "timeFieldName": "@timestamp"
+        }
+      }
+    status_code: [ 200 ]
+    user: "{{ elastic_user.username }}"
+    password: "{{ elastic_user.password }}"
+    force_basic_auth: yes
+    headers:
+      kbn-xsrf: "true"
+  loop:
+    - nginx
+    - php-fpm
+  when: inventory_hostname == play_hosts[0]
+#  no_log: True
+  tags: kibana_ip
